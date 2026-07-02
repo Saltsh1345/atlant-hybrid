@@ -30,6 +30,14 @@ const DEFAULT_KINEMATICS: LiveKinematics = {
   spineFlexion: 0,
 };
 
+const DEFAULT_PROFILE: UserProfile = {
+  height: 175,
+  weight: 75,
+  age: 28,
+  goal: "maintain",
+  injuries: "",
+};
+
 interface AppStore {
   phase: AppPhase;
   calibrationStep: CalibrationStep;
@@ -84,6 +92,8 @@ interface AppStore {
   clearRescanPending: () => void;
   setVoiceMuted: (muted: boolean) => void;
   resetAllData: () => void;
+  /** Default profile for quick training without registration */
+  ensureProfile: () => UserProfile;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -229,6 +239,13 @@ export const useAppStore = create<AppStore>()(
           sessionHistory: [],
           voiceMuted: false,
         });
+      },
+
+      ensureProfile: () => {
+        const existing = get().profile;
+        if (existing) return existing;
+        set({ profile: DEFAULT_PROFILE });
+        return DEFAULT_PROFILE;
       },
     }),
     {

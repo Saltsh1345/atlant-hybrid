@@ -23,14 +23,15 @@ export default function AppShell() {
     if (!state.profile) {
       if (
         state.phase !== "welcome" &&
-        state.phase !== "registration"
+        state.phase !== "registration" &&
+        state.phase !== "sport-select" &&
+        state.phase !== "training" &&
+        state.phase !== "analysis" &&
+        state.phase !== "calibration"
       ) {
         useAppStore.setState({ phase: "welcome" });
       }
       return;
-    }
-    if (state.phase === "welcome") {
-      useAppStore.setState({ phase: "dashboard" });
     }
   }, [profile, phase]);
 

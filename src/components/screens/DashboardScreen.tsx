@@ -153,7 +153,7 @@ export default function DashboardScreen() {
 
       <MuscleReadinessCard report={readiness} />
 
-      {plan && bodyDataLocked && (
+      {plan && (
         <AiPlanCard plan={plan} onStart={() => setPhase("sport-select")} />
       )}
 
@@ -202,7 +202,7 @@ export default function DashboardScreen() {
         <p className="mt-2 text-xs text-slate-500">
           {bodyDataLocked
             ? "Пульс, скорость, мощность и усталость — во время тренировки"
-            : "Сначала пройдите биосканирование тела"}
+            : "Тренировка доступна сразу. Скан тела — для цифрового двойника"}
         </p>
         {geminiOk !== null && (
           <p className="mt-2 font-mono text-[10px] text-slate-400">
@@ -277,18 +277,12 @@ export default function DashboardScreen() {
       )}
 
       <div className="space-y-3">
-        <Button size="lg" onClick={goToScan}>
-          {bodyDataLocked ? "Пересканировать тело" : "Начать сканирование"}
+        <Button size="lg" onClick={() => setPhase("sport-select")}>
+          Начать тренировку
         </Button>
-        {bodyDataLocked && (
-          <Button
-            size="lg"
-            variant="secondary"
-            onClick={() => setPhase("sport-select")}
-          >
-            Выбрать спорт и тренироваться
-          </Button>
-        )}
+        <Button size="lg" variant="secondary" onClick={goToScan}>
+          {bodyDataLocked ? "Пересканировать тело" : "Скан тела (опционально)"}
+        </Button>
         {sessionHistory.length > 0 && (
           <Button size="lg" variant="ghost" onClick={exportData}>
             Экспорт данных {exportMsg && `· ${exportMsg}`}
