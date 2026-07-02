@@ -22,7 +22,7 @@ export default function SportSelectScreen() {
   const startTraining = (sport: Sport, exercise?: StrengthExercise) => {
     ensureProfile();
     setSelectedSport(sport);
-    setSelectedExercise(exercise ?? null);
+    if (exercise) setSelectedExercise(exercise);
     startSession();
     setPhase("training");
   };
