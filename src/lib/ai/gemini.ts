@@ -1,4 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  GEMINI_MODELS,
+  isModelNotFoundError,
+} from "@/lib/ai/geminiModels";
+
+const ANALYSIS_DEADLINE_MS = 9500;
 
 export async function generateAnalysis(payload: {
   sport: string;
@@ -33,33 +39,27 @@ export async function generateAnalysis(payload: {
     const genAI = new GoogleGenerativeAI(key);
     const drillBlock =
       payload.drillFixations && payload.drillFixations.length > 0
-        ? `\nФиксации по командам:\n${payload.drillFixations
+        ? `\nУдары: ${payload.drillFixations
             .map(
               (f) =>
-                `- ${f.commandText} (${f.type}): скорость ${f.speedMs} м/с, точность ${f.accuracy}%, ${f.fixed ? "зачтено" : "не зачтено"}`
+                `${f.commandText} ${f.speedMs}м/с ${f.accuracy}%${f.fixed ? "" : " (слабо)"}`
             )
-            .join("\n")}`
+            .join("; ")}`
         : "";
 
-    const prompt = `ИИ-тренер Atlant-Hybrid. Ответ на русском, кратко.
-Формат:
-1) Итог — 1 строка
-2) Слабые места — 2-3 пункта (мышцы/движения)
-3) План на 2 тренировки — 4-6 пунктов
-4) Безопасность — 1 строка
-
-Спорт: ${payload.sport}
-${payload.exercise ? `Упражнение: ${payload.exercise}` : ""}
-Длительность: ${payload.durationSec}с | VBT: ${payload.avgVelocity} м/с | Пик: ${payload.peakVelocity ?? payload.avgVelocity} м/с
-Техника: ${payload.formScore ?? "—"}% | Усталость: ${payload.fatigue}% | Пик удара: ${payload.peakPunchSpeed} м/с
-${payload.reps != null ? `Повторы: ${payload.reps}` : ""}
-${payload.punches != null ? `Удары: ${payload.punches}` : ""}
-${payload.swings != null ? `Замахи: ${payload.swings}` : ""}${drillBlock}`;
-
-    const preferred = ["gemini-2.0-flash-lite", "gemini-2.5-flash"];
+    const prompt = `ИИ-тренер Atlant. Русский, кратко.
+Итог (1 строка). Слабые места (2 пункта). План на 2 тренировки (4 пункта). Безопасность (1 строка).
+${payload.sport}${payload.exercise ? `/${payload.exercise}` : ""} · ${payload.durationSec}с · VBT ${payload.avgVelocity}м/с · техника ${payload.formScore ?? "—"}% · усталость ${payload.fatigue}%
+${payload.punches != null ? `удары ${payload.punches}` : ""}${payload.swings != null ? ` замахи ${payload.swings}` : ""}${payload.reps != null ? ` повт ${payload.reps}` : ""}${drillBlock}`;
 
     const callModel = async (modelName: string): Promise<string> => {
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          maxOutputTokens: 480,
+          temperature: 0.6,
+        },
+      });
       const result = await model.generateContent(prompt);
       return result.response.text()?.trim() ?? "";
     };
@@ -80,16 +80,28 @@ ${payload.swings != null ? `Замахи: ${payload.swings}` : ""}${drillBlock}`
 
     let text = "";
     const errors: string[] = [];
-    for (const modelName of preferred) {
+    const deadline = Date.now() + ANALYSIS_DEADLINE_MS;
+
+    for (const modelName of GEMINI_MODELS) {
+      const remaining = deadline - Date.now();
+      if (remaining < 1500) {
+        errors.push("deadline_exceeded");
+        break;
+      }
+
       try {
-        text = await withTimeout(callModel(modelName), 8000);
+        text = await withTimeout(callModel(modelName), remaining);
         if (text) break;
         errors.push(`${modelName}: empty_response`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "model_error";
         errors.push(`${modelName}: ${msg}`);
+        if (!isModelNotFoundError(msg) && !msg.startsWith("timeout_")) {
+          break;
+        }
       }
     }
+
     if (!text.trim()) {
       return {
         text: fallbackAnalysis(payload),

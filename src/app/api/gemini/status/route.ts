@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GEMINI_MODELS } from "@/lib/ai/geminiModels";
 
 export async function GET() {
   const key = process.env.GEMINI_API_KEY?.trim();
@@ -7,22 +8,17 @@ export async function GET() {
     return NextResponse.json({
       configured: false,
       available: false,
-      reason: "GEMINI_API_KEY не задан (добавьте в Vercel → Settings → Environment Variables)",
+      reason: "GEMINI_API_KEY не задан (Vercel → Settings → Environment Variables)",
     });
   }
 
-  const models = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-  ];
   const genAI = new GoogleGenerativeAI(key);
   const errors: string[] = [];
 
-  for (const modelName of models) {
+  for (const modelName of GEMINI_MODELS) {
     try {
       const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent("ping");
+      const result = await model.generateContent("ok");
       const ok = Boolean(result.response.text()?.trim());
       if (ok) {
         return NextResponse.json({
