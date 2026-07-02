@@ -1,8 +1,8 @@
-/** Models that work with @google/generative-ai generateContent (v1beta). */
+/** Models for @google/generative-ai generateContent (v1beta). */
 export const GEMINI_MODELS = [
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
+  "gemini-3.5-flash",
   "gemini-2.5-flash",
+  "gemini-2.0-flash",
 ] as const;
 
 export type GeminiModelName = (typeof GEMINI_MODELS)[number];
