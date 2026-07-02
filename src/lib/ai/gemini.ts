@@ -20,7 +20,7 @@ export async function generateAnalysis(payload: {
     fixed: boolean;
   }>;
 }): Promise<{ text: string; source: "gemini" | "fallback"; reason?: string }> {
-  const key = process.env.GEMINI_API_KEY;
+  const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) {
     return {
       text: fallbackAnalysis(payload),
@@ -41,43 +41,50 @@ export async function generateAnalysis(payload: {
             .join("\n")}`
         : "";
 
-    const prompt = `Ты ИИ-тренер Atlant-Hybrid.
-Нужен практичный вывод тренировки на русском, без воды.
-Формат ответа:
-1) "Итог" — 1 короткая строка
-2) "Слабые места" — 2-3 пункта (мышцы и движения, где точность/скорость просели)
-3) "План на 2 ближайшие тренировки" — 4-6 пунктов с конкретикой (подходы/время/темп/техника), фокус на отстающие мышцы и паттерны движения
-4) "Фокус безопасности" — 1 строка
-Опирайся на эти данные и учитывай специфику спорта (бокс != теннис).
-${drillBlock ? "При анализе ударов/замахов сравни скорость и точность по каждой команде." : ""}
+    const prompt = `ИИ-тренер Atlant-Hybrid. Ответ на русском, кратко.
+Формат:
+1) Итог — 1 строка
+2) Слабые места — 2-3 пункта (мышцы/движения)
+3) План на 2 тренировки — 4-6 пунктов
+4) Безопасность — 1 строка
 
 Спорт: ${payload.sport}
 ${payload.exercise ? `Упражнение: ${payload.exercise}` : ""}
-Длительность: ${payload.durationSec} сек
-Средняя скорость VBT: ${payload.avgVelocity} м/с
-Пик скорости: ${payload.peakVelocity ?? payload.avgVelocity} м/с
-Оценка техники: ${payload.formScore ?? "—"}%
-Пик удара: ${payload.peakPunchSpeed} м/с
-Усталость: ${payload.fatigue}%
+Длительность: ${payload.durationSec}с | VBT: ${payload.avgVelocity} м/с | Пик: ${payload.peakVelocity ?? payload.avgVelocity} м/с
+Техника: ${payload.formScore ?? "—"}% | Усталость: ${payload.fatigue}% | Пик удара: ${payload.peakPunchSpeed} м/с
 ${payload.reps != null ? `Повторы: ${payload.reps}` : ""}
 ${payload.punches != null ? `Удары: ${payload.punches}` : ""}
-${payload.swings != null ? `Замахи: ${payload.swings}` : ""}${drillBlock}
-Тон: профессиональный и конкретный, без медицинских диагнозов.`;
+${payload.swings != null ? `Замахи: ${payload.swings}` : ""}${drillBlock}`;
 
-    const preferred = [
-      "gemini-2.0-flash",
-      "gemini-2.0-flash-lite",
-      "gemini-2.5-flash",
-      "gemini-1.5-flash",
-    ];
+    const preferred = ["gemini-2.0-flash-lite", "gemini-2.5-flash"];
+
+    const callModel = async (modelName: string): Promise<string> => {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return result.response.text()?.trim() ?? "";
+    };
+
+    const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+      new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms);
+        promise
+          .then((v) => {
+            clearTimeout(t);
+            resolve(v);
+          })
+          .catch((e) => {
+            clearTimeout(t);
+            reject(e);
+          });
+      });
+
     let text = "";
     const errors: string[] = [];
     for (const modelName of preferred) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        text = result.response.text() || "";
-        if (text.trim()) break;
+        text = await withTimeout(callModel(modelName), 8000);
+        if (text) break;
+        errors.push(`${modelName}: empty_response`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "model_error";
         errors.push(`${modelName}: ${msg}`);

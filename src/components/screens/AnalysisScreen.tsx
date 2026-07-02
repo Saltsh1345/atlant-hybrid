@@ -12,6 +12,20 @@ import { getPeakPunchSpeed, getPeakVelocity } from "@/lib/pose/vbt";
 import { getRepCount, getPunchCount, getSwingCount } from "@/lib/pose/repCounter";
 import { getDrillFixations, drillSummary } from "@/lib/training/drillResults";
 import { getAvgFormScore } from "@/lib/pose/formScore";
+import type { Sport } from "@/types";
+
+function fallbackAnalysisLocal(
+  stats: { formScore?: number; reps?: number; punches?: number; swings?: number },
+  sport: Sport
+): string {
+  const parts = [`Отличная работа по ${sport}!`];
+  if (stats.formScore) parts.push(`Техника: ${stats.formScore}%.`);
+  if (stats.punches) parts.push(`Ударов: ${stats.punches}.`);
+  if (stats.swings) parts.push(`Замахов: ${stats.swings}.`);
+  if (stats.reps) parts.push(`Повторов: ${stats.reps}.`);
+  parts.push("Продолжайте тренироваться регулярно.");
+  return parts.join(" ");
+}
 
 export default function AnalysisScreen() {
   const [loading, setLoading] = useState(true);
@@ -94,7 +108,22 @@ export default function AnalysisScreen() {
             })),
           }),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const reason =
+            typeof data.reason === "string"
+              ? data.reason
+              : typeof data.error === "string"
+                ? data.error
+                : `HTTP ${res.status}`;
+          const text = fallbackAnalysisLocal(stats, selectedSport);
+          setSource("fallback");
+          setAnalysisReason(reason);
+          setAnalysis(text);
+          endSession(text, stats);
+          speak(text);
+          return;
+        }
         const text =
           data.analysis ??
           "Отличная тренировка! Продолжайте в том же духе.";
@@ -105,9 +134,12 @@ export default function AnalysisScreen() {
         setAnalysis(text);
         endSession(text, stats);
         speak(text);
-      } catch {
-        const fallback =
-          "Отличная работа! Вы показали стабильную технику. Продолжайте тренироваться регулярно.";
+      } catch (e) {
+        const reason =
+          e instanceof Error ? e.message : "Сеть или сервер недоступен";
+        const fallback = fallbackAnalysisLocal(stats, selectedSport);
+        setSource("fallback");
+        setAnalysisReason(reason);
         setAnalysis(fallback);
         endSession(fallback, stats);
         speak(fallback);

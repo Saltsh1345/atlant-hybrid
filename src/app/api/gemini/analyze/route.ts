@@ -22,9 +22,12 @@ export async function POST(req: Request) {
       drillFixations: body.drillFixations,
     });
     return NextResponse.json({ analysis: text, source, reason: reason ?? null });
-  } catch {
+  } catch (e) {
     return NextResponse.json(
-      { error: "Analysis failed" },
+      {
+        error: "Analysis failed",
+        reason: e instanceof Error ? e.message : "unknown",
+      },
       { status: 500 }
     );
   }
