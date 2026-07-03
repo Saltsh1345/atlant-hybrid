@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { NormalizedLandmark } from "@/types";
-
-const WASM =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
-const MODEL =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+import {
+  acquirePoseLandmarker,
+  releasePoseLandmarker,
+} from "@/lib/pose/mediapipePose";
 
 export type CameraStatus = "loading" | "ready" | "error";
 
@@ -20,7 +19,6 @@ export function usePoseTracker(
       v: HTMLVideoElement,
       t: number
     ) => { landmarks: NormalizedLandmark[][] };
-    close: () => void;
   } | null>(null);
   const [poseReady, setPoseReady] = useState(false);
   const [poseError, setPoseError] = useState<string | null>(null);
@@ -31,43 +29,27 @@ export function usePoseTracker(
     setPoseReady(false);
     setPoseError(null);
 
-    (async () => {
-      try {
-        const { FilesetResolver, PoseLandmarker } = await import(
-          "@mediapipe/tasks-vision"
-        );
-        const vision = await FilesetResolver.forVisionTasks(WASM);
-        let lm;
-        try {
-          lm = await PoseLandmarker.createFromOptions(vision, {
-            baseOptions: { modelAssetPath: MODEL, delegate: "GPU" },
-            runningMode: "VIDEO",
-            numPoses: 1,
-          });
-        } catch {
-          lm = await PoseLandmarker.createFromOptions(vision, {
-            baseOptions: { modelAssetPath: MODEL, delegate: "CPU" },
-            runningMode: "VIDEO",
-            numPoses: 1,
-          });
+    acquirePoseLandmarker()
+      .then((lm) => {
+        if (cancelled) {
+          releasePoseLandmarker();
+          return;
         }
+        landmarkerRef.current = lm;
+        setPoseReady(true);
+      })
+      .catch(() => {
         if (!cancelled) {
-          landmarkerRef.current = lm;
-          setPoseReady(true);
-        } else {
-          lm.close();
+          setPoseError(
+            "MediaPipe недоступен: нет WebGL или слабое GPU. Попробуйте Chrome/Edge или обновите страницу."
+          );
         }
-      } catch {
-        if (!cancelled) {
-          setPoseError("Не удалось загрузить MediaPipe. Проверьте интернет.");
-        }
-      }
-    })();
+      });
 
     return () => {
       cancelled = true;
-      landmarkerRef.current?.close();
       landmarkerRef.current = null;
+      releasePoseLandmarker();
       setPoseReady(false);
     };
   }, [enabled]);
@@ -76,9 +58,13 @@ export function usePoseTracker(
     const video = videoRef.current;
     const lm = landmarkerRef.current;
     if (!video || !lm || video.readyState < 2) return null;
-    const result = lm.detectForVideo(video, performance.now());
-    landmarksRef.current = result.landmarks[0] ?? null;
-    return landmarksRef.current;
+    try {
+      const result = lm.detectForVideo(video, performance.now());
+      landmarksRef.current = result.landmarks[0] ?? null;
+      return landmarksRef.current;
+    } catch {
+      return landmarksRef.current;
+    }
   }, [videoRef]);
 
   return { tick, poseReady, poseError };
@@ -115,6 +101,8 @@ export function useCamera(
         const v = videoRef.current;
         if (v) {
           v.srcObject = stream;
+          v.playsInline = true;
+          v.muted = true;
           await v.play();
           setCameraStatus("ready");
         }
@@ -131,6 +119,8 @@ export function useCamera(
     return () => {
       cancelled = true;
       stream?.getTracks().forEach((t) => t.stop());
+      const v = videoRef.current;
+      if (v) v.srcObject = null;
     };
   }, [active, videoRef]);
 

@@ -76,7 +76,7 @@ export default function SportPicker({
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.06 }}
-              className="w-full text-left"
+              className="relative z-10 w-full cursor-pointer text-left"
             >
               <Card
                 className={`flex items-center gap-3 transition hover:shadow-md hover:ring-2 hover:ring-cyan-100 ${compact ? "!py-3" : ""}`}
@@ -113,7 +113,7 @@ export default function SportPicker({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
-                className="w-full text-left"
+                className="relative z-10 w-full cursor-pointer text-left"
               >
                 <Card className="transition hover:shadow-md hover:ring-2 hover:ring-emerald-100">
                   <p className="font-semibold">{ex.title}</p>

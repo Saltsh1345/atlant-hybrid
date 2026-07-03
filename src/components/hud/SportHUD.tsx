@@ -224,12 +224,12 @@ function BoxingHUD({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.2 }}
             transition={{ duration: 0.35 }}
-            className="absolute top-1/2 left-1/2 z-40 -translate-x-1/2 -translate-y-1/3 rounded-2xl border border-cyan-400/50 bg-cyan-500/15 px-8 py-4 text-center shadow-[0_0_40px_rgba(6,182,212,0.35)] backdrop-blur-md"
+            className="absolute top-1/2 left-1/2 z-40 -translate-x-1/2 -translate-y-1/3 rounded-2xl border-2 border-orange-400/60 bg-gradient-to-br from-orange-500/30 to-red-500/20 px-10 py-5 text-center shadow-[0_0_60px_rgba(249,115,22,0.55)] backdrop-blur-md"
           >
-            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-700">
-              Скорость выброса
+            <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-orange-200">
+              Удар
             </p>
-            <p className="font-mono text-5xl font-black tabular-nums text-cyan-500 drop-shadow-sm">
+            <p className="font-mono text-5xl font-black tabular-nums text-orange-400 drop-shadow-[0_0_12px_rgba(251,146,60,0.8)]">
               {(mock ? 2.14 : displaySpeed).toFixed(2)}
             </p>
             <p className="text-sm font-medium text-slate-600">м/с</p>
@@ -353,16 +353,22 @@ function TennisHUD({
       </div>
 
       <AnimatePresence>
-        {strikeFlash && lastStrikeSpeed != null && (
+        {(strikeFlash || (mock && MOCK_PREVIEW)) && (
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="absolute top-32 left-1/2 z-40 -translate-x-1/2 rounded-xl border border-emerald-300/50 bg-emerald-500/10 px-6 py-2 backdrop-blur-md"
+            key={lastStrikeSpeed ?? swing}
+            initial={{ opacity: 0, scale: 0.6, rotate: -6 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 1.35, rotate: 4 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="absolute top-1/2 left-1/2 z-40 -translate-x-1/2 -translate-y-1/3 rounded-2xl border-2 border-emerald-400/50 bg-gradient-to-br from-emerald-500/25 to-cyan-500/15 px-10 py-4 text-center shadow-[0_0_50px_rgba(16,185,129,0.45)] backdrop-blur-md"
           >
-            <p className="font-mono text-3xl font-black tabular-nums text-emerald-600">
-              {lastStrikeSpeed.toFixed(2)} м/с
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-200">
+              Замах ракеткой
             </p>
+            <p className="font-mono text-4xl font-black tabular-nums text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.7)]">
+              {(mock ? 2.14 : lastStrikeSpeed ?? swing).toFixed(2)}
+            </p>
+            <p className="text-xs font-medium text-emerald-100/90">м/с</p>
           </motion.div>
         )}
       </AnimatePresence>

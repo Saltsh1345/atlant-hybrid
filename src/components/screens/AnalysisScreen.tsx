@@ -7,6 +7,7 @@ import Card from "@/components/ui/Card";
 import SessionStats from "@/components/analysis/SessionStats";
 import VelocityChart from "@/components/charts/VelocityChart";
 import { useAppStore } from "@/store/useAppStore";
+import { useDashboardLayoutStore } from "@/store/useDashboardLayoutStore";
 import { speak } from "@/lib/ai/speech";
 import { getPeakPunchSpeed, getPeakVelocity } from "@/lib/pose/vbt";
 import { getRepCount, getPunchCount, getSwingCount } from "@/lib/pose/repCounter";
@@ -18,51 +19,42 @@ function fallbackAnalysisLocal(
   stats: { formScore?: number; reps?: number; punches?: number; swings?: number },
   sport: Sport
 ): string {
-  return `## Итог сессии
-Хорошая работа по ${sport}! Техника ${stats.formScore ?? "—"}%, данные VBT записаны.
+  return `Тренировка по ${sport} завершена. ${
+    stats.formScore != null && stats.formScore > 0
+      ? `Техника ${stats.formScore}%.`
+      : "Камера не собрала достаточно данных для оценки техники."
+  } Если drill-команды отмечены как пропуск, встаньте ближе к камере и выполняйте удары и замахи в полной амплитуде, не обрезая движение.
 
-## Слабые места
-- Продолжайте контролировать скорость на каждом повторе/ударе
-- Следите за положением корпуса при усталости
+На следующей сессии начните с медленной отработки базовой стойки и положения корпуса, затем увеличивайте скорость только когда движение стабильно. Сделайте три подхода с паузой 60–90 секунд и следите, чтобы скорость не падала к концу подхода. На второй тренировке повторите тот же объём и добавьте один подход, если техника останется ровной.
 
-## План на 2 тренировки
-- Разминка 5 мин
-- 3–4 рабочих подхода с контролем VBT
-- Отдых 60–90 с между подходами
-- Завершение: стабилизация корпуса
-
-## Безопасность
-Не увеличивайте нагрузку при падении техники.${stats.reps ? ` Повторов: ${stats.reps}.` : ""}${stats.punches ? ` Ударов: ${stats.punches}.` : ""}${stats.swings ? ` Замахов: ${stats.swings}.` : ""}`;
+Не увеличивайте нагрузку при усталости и боли в суставах.${
+    stats.reps ? ` Повторений за сессию: ${stats.reps}.` : ""
+  }${stats.punches ? ` Ударов: ${stats.punches}.` : ""}${
+    stats.swings ? ` Замахов: ${stats.swings}.` : ""
+  }`;
 }
 
 function speakAnalysisSummary(text: string) {
   const spoken =
-    text.split("\n").find((l) => l.trim() && !l.startsWith("#")) ??
-    text.slice(0, 200);
+    text.split(/\n\n+/).find((p) => p.trim().length > 20) ??
+    text.slice(0, 280);
   speak(spoken);
 }
 
 function AnalysisBody({ text }: { text: string }) {
-  const sections = text.split(/\n(?=## )/).filter(Boolean);
+  const paragraphs = text
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-  if (sections.length > 1) {
+  if (paragraphs.length > 1) {
     return (
       <div className="space-y-4">
-        {sections.map((block) => {
-          const lines = block.trim().split("\n");
-          const title = lines[0]?.replace(/^##\s*/, "") ?? "Анализ";
-          const body = lines.slice(1).join("\n").trim();
-          return (
-            <div key={title}>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-cyan-800">
-                {title}
-              </p>
-              <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
-                {body}
-              </p>
-            </div>
-          );
-        })}
+        {paragraphs.map((paragraph, i) => (
+          <p key={i} className="leading-relaxed text-slate-700">
+            {paragraph}
+          </p>
+        ))}
       </div>
     );
   }
@@ -88,6 +80,12 @@ export default function AnalysisScreen() {
   const kinematics = useAppStore((s) => s.kinematics);
   const endSession = useAppStore((s) => s.endSession);
   const setPhase = useAppStore((s) => s.setPhase);
+  const setFocusSportPicker = useDashboardLayoutStore((s) => s.setFocusSportPicker);
+
+  const goTrainAgain = () => {
+    setFocusSportPicker(true);
+    setPhase("dashboard");
+  };
 
   const velocities = sessionSamples.map((s) => s.velocityMs);
   const avgVelocity =
@@ -284,7 +282,7 @@ export default function AnalysisScreen() {
             <div className="h-4 animate-pulse rounded bg-slate-100" />
             <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100" />
             <p className="text-center text-sm text-muted">
-              Анализ VBT-данных...
+              ИИ разбирает технику и готовит план...
             </p>
           </div>
         ) : (
@@ -306,7 +304,7 @@ export default function AnalysisScreen() {
 
       {!loading && (
         <div className="mt-6 space-y-3">
-          <Button size="lg" onClick={() => setPhase("sport-select")}>
+          <Button size="lg" onClick={goTrainAgain}>
             Ещё тренировка
           </Button>
           <Button

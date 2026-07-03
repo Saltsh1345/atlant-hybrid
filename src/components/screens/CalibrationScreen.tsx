@@ -11,6 +11,7 @@ import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import CalibrationProgress from "@/components/calibration/CalibrationProgress";
 import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
 import { useAppStore } from "@/store/useAppStore";
+import { useDashboardLayoutStore } from "@/store/useDashboardLayoutStore";
 import { CALIBRATION_SCRIPT } from "@/lib/calibration/script";
 import {
   isPoseGuideStep,
@@ -39,6 +40,7 @@ export default function CalibrationScreen() {
   const [sweepPhase, setSweepPhase] = useState(0);
 
   const setPhase = useAppStore((s) => s.setPhase);
+  const setFocusSportPicker = useDashboardLayoutStore((s) => s.setFocusSportPicker);
   const latchBodyData = useAppStore((s) => s.latchBodyData);
   const latchedBody = useAppStore((s) => s.latchedBody);
   const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
@@ -349,9 +351,12 @@ export default function CalibrationScreen() {
               <Button
                 size="lg"
                 variant="secondary"
-                onClick={() => setPhase("sport-select")}
+                onClick={() => {
+                  setFocusSportPicker(true);
+                  setPhase("dashboard");
+                }}
               >
-                К выбору спорта
+                К выбору тренировки
               </Button>
             </>
           )}

@@ -7,6 +7,7 @@ import { useContainerWidth } from "react-grid-layout";
 import Button from "@/components/ui/Button";
 import {
   WIDGET_META,
+  allWidgetIds,
   layoutForVisible,
   type DashboardWidgetId,
 } from "@/lib/dashboard/widgets";
@@ -26,12 +27,12 @@ const COLS = 12;
 
 interface DashboardDesktopGridProps {
   widgets: Partial<Record<DashboardWidgetId, ReactNode>>;
-  availableToAdd: DashboardWidgetId[];
+  showBodyTiles?: boolean;
 }
 
 export default function DashboardDesktopGrid({
   widgets,
-  availableToAdd,
+  showBodyTiles = true,
 }: DashboardDesktopGridProps) {
   const { width, containerRef, mounted } = useContainerWidth();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -55,10 +56,10 @@ export default function DashboardDesktopGrid({
     [editMode, setLayout]
   );
 
-  const hiddenWidgets = (
-    Object.keys(WIDGET_META) as DashboardWidgetId[]
-  ).filter(
-    (id) => !visibleWidgets.includes(id) && availableToAdd.includes(id)
+  const hiddenWidgets = allWidgetIds().filter(
+    (id) =>
+      !visibleWidgets.includes(id) &&
+      (id !== "body-metrics" || showBodyTiles)
   );
 
   return (
@@ -154,7 +155,10 @@ export default function DashboardDesktopGrid({
           preventCollision={false}
         >
           {visibleWidgets.map((id) => (
-            <div key={id} className="h-full">
+            <div
+              key={id}
+              className={`h-full ${id === "sport-picker" && editMode ? "pointer-events-auto" : ""}`}
+            >
               <DashboardWidgetFrame
                 id={id}
                 editMode={editMode}

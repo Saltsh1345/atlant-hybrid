@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { DashboardWidgetId } from "@/lib/dashboard/widgets";
-import { WIDGET_META } from "@/lib/dashboard/widgets";
+import { PINNED_WIDGETS, WIDGET_META } from "@/lib/dashboard/widgets";
 
 export default function DashboardWidgetFrame({
   id,
@@ -16,6 +16,7 @@ export default function DashboardWidgetFrame({
   children: ReactNode;
 }) {
   const meta = WIDGET_META[id];
+  const pinned = PINNED_WIDGETS.includes(id);
 
   return (
     <div
@@ -35,17 +36,21 @@ export default function DashboardWidgetFrame({
               {meta.icon} {meta.title}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => onRemove(id)}
-            className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
-            title="Убрать виджет"
-          >
-            ✕
-          </button>
+          {!pinned && (
+            <button
+              type="button"
+              onClick={() => onRemove(id)}
+              className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
+              title="Убрать виджет"
+            >
+              ✕
+            </button>
+          )}
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-auto p-1">{children}</div>
+      <div className="min-h-0 flex-1 overflow-auto p-1 [&_button]:pointer-events-auto">
+        {children}
+      </div>
     </div>
   );
 }

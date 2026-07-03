@@ -5,22 +5,16 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import SportPicker from "@/components/training/SportPicker";
 import { useAppStore } from "@/store/useAppStore";
+import { goToTraining } from "@/lib/navigation/goToTraining";
 import type { Sport, StrengthExercise } from "@/types";
 
 export default function WelcomeScreen() {
   const setPhase = useAppStore((s) => s.setPhase);
   const profile = useAppStore((s) => s.profile);
   const ensureProfile = useAppStore((s) => s.ensureProfile);
-  const setSelectedSport = useAppStore((s) => s.setSelectedSport);
-  const setSelectedExercise = useAppStore((s) => s.setSelectedExercise);
-  const startSession = useAppStore((s) => s.startSession);
 
   const startTraining = (sport: Sport, exercise?: StrengthExercise) => {
-    ensureProfile();
-    setSelectedSport(sport);
-    if (exercise) setSelectedExercise(exercise);
-    startSession();
-    setPhase("training");
+    goToTraining(sport, exercise);
   };
 
   return (

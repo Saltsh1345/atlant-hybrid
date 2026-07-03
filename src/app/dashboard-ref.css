@@ -1,0 +1,120 @@
+/* Reference-style desktop dashboard (light theme) */
+.dashboard-ref {
+  --dash-bg: #eef1f6;
+  --dash-card: #ffffff;
+  --dash-blue: #2b9fff;
+  --dash-blue-dark: #1a7fe8;
+  --dash-text: #1e293b;
+  --dash-muted: #64748b;
+  min-height: 100dvh;
+  background: var(--dash-bg);
+}
+
+.dashboard-ref-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.72fr) minmax(
+      0,
+      0.72fr
+    )
+    minmax(240px, 26%);
+  grid-template-rows: 200px 148px 148px 168px;
+}
+
+.dashboard-ref-activity {
+  grid-column: 1 / span 2;
+  grid-row: 1 / span 2;
+}
+
+.dashboard-ref-steps {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.dashboard-ref-load {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.dashboard-ref-pulse {
+  grid-column: 3 / span 2;
+  grid-row: 2;
+}
+
+.dashboard-ref-water {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.dashboard-ref-sleep {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.dashboard-ref-macros {
+  grid-column: 3 / span 2;
+  grid-row: 3;
+}
+
+.dashboard-ref-run {
+  grid-column: 1;
+  grid-row: 4;
+}
+
+.dashboard-ref-plan {
+  grid-column: 2 / span 2;
+  grid-row: 4;
+}
+
+.dashboard-ref-twin {
+  grid-column: 5;
+  grid-row: 1 / span 4;
+  min-width: 0;
+}
+
+@media (min-width: 1536px) {
+  .dashboard-ref-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(
+        0,
+        0.8fr
+      );
+    grid-template-rows: 210px 155px 155px 175px;
+  }
+}
+
+@media (max-width: 1279px) {
+  .dashboard-ref-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+  }
+  .dashboard-ref-activity,
+  .dashboard-ref-steps,
+  .dashboard-ref-load,
+  .dashboard-ref-pulse,
+  .dashboard-ref-water,
+  .dashboard-ref-sleep,
+  .dashboard-ref-macros,
+  .dashboard-ref-run,
+  .dashboard-ref-plan,
+  .dashboard-ref-twin {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .dashboard-ref-twin {
+    min-height: 320px;
+  }
+}
+
+.dash-card {
+  border-radius: 22px;
+  background: var(--dash-card);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.dash-card-activity {
+  border-radius: 24px;
+  background: linear-gradient(145deg, #3cabff 0%, #2b9fff 45%, #1f8fe8 100%);
+  box-shadow: 0 16px 40px rgba(43, 159, 255, 0.35);
+  color: white;
+}

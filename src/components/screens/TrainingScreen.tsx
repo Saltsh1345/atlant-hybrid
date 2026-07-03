@@ -2,7 +2,9 @@
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import Button from "@/components/ui/Button";
-import PunchTrail from "@/components/camera/PunchTrail";
+import StrikeEffects, {
+  type StrikeBurst,
+} from "@/components/camera/StrikeEffects";
 import AutoFrameViewport from "@/components/camera/AutoFrameViewport";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import CountdownOverlay from "@/components/training/CountdownOverlay";
@@ -31,6 +33,7 @@ import { useSportDrill } from "@/hooks/useSportDrill";
 import SportDrillOverlay from "@/components/training/SportDrillOverlay";
 import { speakGuidance, stopSpeaking } from "@/lib/ai/speech";
 import type { NormalizedLandmark } from "@/types";
+import { LM } from "@/lib/pose/landmarks";
 
 export default function TrainingScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -38,6 +41,8 @@ export default function TrainingScreen() {
   const [coachText, setCoachText] = useState("");
   const [strikeFlash, setStrikeFlash] = useState(false);
   const [lastStrikeSpeed, setLastStrikeSpeed] = useState<number | null>(null);
+  const [strikeBurst, setStrikeBurst] = useState<StrikeBurst | null>(null);
+  const strikeIdRef = useRef(0);
   const [reps, setReps] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [countdownDone, setCountdownDone] = useState(false);
@@ -96,11 +101,31 @@ export default function TrainingScreen() {
     speakGuidance("training:coach", text, { cooldownMs: 6000 });
   }, []);
 
-  const flashStrike = useCallback((speed: number) => {
-    setLastStrikeSpeed(speed);
-    setStrikeFlash(true);
-    setTimeout(() => setStrikeFlash(false), 600);
-  }, []);
+  const flashStrike = useCallback(
+    (speed: number, lm: NormalizedLandmark[]) => {
+      setLastStrikeSpeed(speed);
+      setStrikeFlash(true);
+      const lW = lm[LM.L_WRIST];
+      const rW = lm[LM.R_WRIST];
+      const w = (lW.visibility ?? 0) > (rW.visibility ?? 0) ? lW : rW;
+      const burstId = ++strikeIdRef.current;
+      if ((w.visibility ?? 0) > 0.35) {
+        setStrikeBurst({
+          id: burstId,
+          x: 1 - w.x,
+          y: w.y,
+          speed,
+          sport: selectedSport as "boxing" | "tennis",
+          t: Date.now(),
+        });
+      }
+      setTimeout(() => {
+        setStrikeFlash(false);
+        setStrikeBurst((prev) => (prev?.id === burstId ? null : prev));
+      }, 650);
+    },
+    [selectedSport]
+  );
 
   useEffect(() => {
     if (!countdownDone) return;
@@ -154,7 +179,7 @@ export default function TrainingScreen() {
             k.elbowAngle
           );
           if (speed != null) {
-            flashStrike(speed);
+            flashStrike(speed, lm);
             const hitForm = computeFormScore(selectedSport, selectedExercise, k);
             drill.reportHit({
               speedMs: speed,
@@ -171,7 +196,7 @@ export default function TrainingScreen() {
             k.elbowAngle
           );
           if (speed != null) {
-            flashStrike(speed);
+            flashStrike(speed, lm);
             const hitForm = computeFormScore(selectedSport, selectedExercise, k);
             drill.reportHit({
               speedMs: speed,
@@ -236,14 +261,25 @@ export default function TrainingScreen() {
             voiceNudges={autoFrameVoice}
           >
             <LiveScanGrid active={isDrillSport && drill.isTracking} />
-            {!isDrillSport && (
-              <PunchTrail
-                landmarks={landmarks}
-                active={
-                  selectedSport === "boxing" || selectedSport === "tennis"
-                }
-              />
-            )}
+            {(selectedSport === "boxing" || selectedSport === "tennis") &&
+              trackingActive && (
+                <StrikeEffects
+                  landmarks={landmarks}
+                  active
+                  sport={selectedSport}
+                  burst={strikeBurst}
+                />
+              )}
+            {strikeFlash &&
+              (selectedSport === "boxing" || selectedSport === "tennis") && (
+                <div
+                  className={`pointer-events-none absolute inset-0 z-[14] ${
+                    selectedSport === "boxing"
+                      ? "strike-vignette-boxing"
+                      : "strike-vignette-tennis"
+                  }`}
+                />
+              )}
           </AutoFrameViewport>
 
           <CameraStatusOverlay
