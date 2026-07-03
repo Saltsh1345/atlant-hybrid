@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { generateAnalysis } from "@/lib/ai/gemini";
 
-/** Vercel Hobby — до 10 с; на Pro можно поднять до 60 */
-export const maxDuration = 10;
+/** Vercel Hobby — до 10 с; локально и на Pro можно дольше */
+export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {

@@ -28,11 +28,11 @@ export default function ProgressChart({
   if (data.length < 2) return null;
 
   return (
-    <Card className="mb-4">
+    <Card className="h-full md:p-5">
       <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
         Прогресс (последние сессии)
       </p>
-      <div className="h-28 w-full">
+      <div className="h-28 w-full md:h-36 lg:h-40">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <XAxis dataKey="i" hide />

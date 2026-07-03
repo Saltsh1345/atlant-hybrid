@@ -18,13 +18,60 @@ function fallbackAnalysisLocal(
   stats: { formScore?: number; reps?: number; punches?: number; swings?: number },
   sport: Sport
 ): string {
-  const parts = [`Отличная работа по ${sport}!`];
-  if (stats.formScore) parts.push(`Техника: ${stats.formScore}%.`);
-  if (stats.punches) parts.push(`Ударов: ${stats.punches}.`);
-  if (stats.swings) parts.push(`Замахов: ${stats.swings}.`);
-  if (stats.reps) parts.push(`Повторов: ${stats.reps}.`);
-  parts.push("Продолжайте тренироваться регулярно.");
-  return parts.join(" ");
+  return `## Итог сессии
+Хорошая работа по ${sport}! Техника ${stats.formScore ?? "—"}%, данные VBT записаны.
+
+## Слабые места
+- Продолжайте контролировать скорость на каждом повторе/ударе
+- Следите за положением корпуса при усталости
+
+## План на 2 тренировки
+- Разминка 5 мин
+- 3–4 рабочих подхода с контролем VBT
+- Отдых 60–90 с между подходами
+- Завершение: стабилизация корпуса
+
+## Безопасность
+Не увеличивайте нагрузку при падении техники.${stats.reps ? ` Повторов: ${stats.reps}.` : ""}${stats.punches ? ` Ударов: ${stats.punches}.` : ""}${stats.swings ? ` Замахов: ${stats.swings}.` : ""}`;
+}
+
+function speakAnalysisSummary(text: string) {
+  const spoken =
+    text.split("\n").find((l) => l.trim() && !l.startsWith("#")) ??
+    text.slice(0, 200);
+  speak(spoken);
+}
+
+function AnalysisBody({ text }: { text: string }) {
+  const sections = text.split(/\n(?=## )/).filter(Boolean);
+
+  if (sections.length > 1) {
+    return (
+      <div className="space-y-4">
+        {sections.map((block) => {
+          const lines = block.trim().split("\n");
+          const title = lines[0]?.replace(/^##\s*/, "") ?? "Анализ";
+          const body = lines.slice(1).join("\n").trim();
+          return (
+            <div key={title}>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-cyan-800">
+                {title}
+              </p>
+              <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
+                {body}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
+      {text}
+    </p>
+  );
 }
 
 export default function AnalysisScreen() {
@@ -121,7 +168,7 @@ export default function AnalysisScreen() {
           setAnalysisReason(reason);
           setAnalysis(text);
           endSession(text, stats);
-          speak(text);
+          speakAnalysisSummary(text);
           return;
         }
         const text =
@@ -133,7 +180,7 @@ export default function AnalysisScreen() {
         );
         setAnalysis(text);
         endSession(text, stats);
-        speak(text);
+        speakAnalysisSummary(text);
       } catch (e) {
         const reason =
           e instanceof Error ? e.message : "Сеть или сервер недоступен";
@@ -142,7 +189,7 @@ export default function AnalysisScreen() {
         setAnalysisReason(reason);
         setAnalysis(fallback);
         endSession(fallback, stats);
-        speak(fallback);
+        speakAnalysisSummary(fallback);
       } finally {
         setLoading(false);
       }
@@ -242,7 +289,7 @@ export default function AnalysisScreen() {
           </div>
         ) : (
           <>
-            <p className="leading-relaxed text-slate-700">🎙 {analysis}</p>
+            <AnalysisBody text={analysis} />
             <p className="mt-3 text-[10px] text-muted">
               {source === "gemini"
                 ? "Анализ от Gemini AI"

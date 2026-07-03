@@ -73,11 +73,11 @@ export function fullBodyProgress(
   const ok =
     headDetected &&
     feetDetected &&
-    ankleY > 0.68 &&
-    bodySpan > 0.55 &&
-    shoulderW > 0.09 &&
-    shoulderW < 0.3 &&
-    score >= 0.82;
+    ankleY > 0.62 &&
+    bodySpan > 0.48 &&
+    shoulderW > 0.08 &&
+    shoulderW < 0.34 &&
+    score >= 0.72;
 
   let reason: string;
   if (!headDetected) {

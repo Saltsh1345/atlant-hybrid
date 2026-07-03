@@ -4,12 +4,14 @@ import type { ReadinessReport } from "@/lib/readiness";
 
 export default function MuscleReadinessCard({
   report,
+  className = "",
 }: {
   report: ReadinessReport;
+  className?: string;
 }) {
   if (report.overall === 0) {
     return (
-      <div className="atlant-metric-card mb-4 p-4">
+      <div className={`atlant-metric-card p-4 md:p-5 ${className}`}>
         <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
           Готовность мышц
         </p>
@@ -21,7 +23,7 @@ export default function MuscleReadinessCard({
   }
 
   return (
-    <div className="atlant-metric-card mb-4 p-4">
+    <div className={`atlant-metric-card p-4 md:p-5 ${className}`}>
       <div className="mb-4 flex items-end justify-between">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-600">

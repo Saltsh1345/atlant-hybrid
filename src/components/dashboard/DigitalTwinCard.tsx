@@ -11,6 +11,7 @@ interface DigitalTwinCardProps {
   latchedBody: LatchedBodyData | null;
   onScan: () => void;
   onOpenLive?: () => void;
+  className?: string;
 }
 
 export default function DigitalTwinCard({
@@ -18,6 +19,7 @@ export default function DigitalTwinCard({
   latchedBody,
   onScan,
   onOpenLive,
+  className = "",
 }: DigitalTwinCardProps) {
   const { asset, available, ready } = useAvatarAsset();
   const [showTwin, setShowTwin] = useState(false);
@@ -29,7 +31,7 @@ export default function DigitalTwinCard({
   }, []);
 
   return (
-    <div className="atlant-metric-card mb-5 p-4">
+    <div className={`atlant-metric-card flex h-full flex-col p-4 md:p-5 ${className}`}>
       <div className="relative z-[1] mb-3 flex items-start justify-between">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700">
@@ -70,12 +72,15 @@ export default function DigitalTwinCard({
       )}
 
       {showTwin ? (
-        <BiomechTwinPanel
-          latchedBody={latchedBody}
-          locked={!!locked}
-          tall
-          showHud
-        />
+        <div className="min-h-0 flex-1">
+          <BiomechTwinPanel
+            latchedBody={latchedBody}
+            locked={!!locked}
+            tall
+            showHud
+            className="h-full min-h-[220px]"
+          />
+        </div>
       ) : (
         <div className="flex h-64 items-center justify-center rounded-2xl bg-cyan-50/50 text-sm text-slate-400">
           Инициализация визуализации…

@@ -1,7 +1,6 @@
 "use client";
 
-import AvatarViewer from "@/components/three/AvatarViewer";
-import { useAvatarAsset } from "@/hooks/useAvatarAsset";
+import TwinPlaceholder from "@/components/visual/TwinPlaceholder";
 import type { LatchedBodyData } from "@/types";
 
 interface BiomechTwinPanelProps {
@@ -10,6 +9,7 @@ interface BiomechTwinPanelProps {
   tall?: boolean;
   compact?: boolean;
   showHud?: boolean;
+  className?: string;
 }
 
 function FloorGrid() {
@@ -52,16 +52,6 @@ function FloorGrid() {
           strokeWidth={0.8}
         />
       ))}
-      {Array.from({ length: 8 }).map((_, i) => (
-        <circle
-          key={`dot-${i}`}
-          cx={120 + i * 35}
-          cy={150 - (i % 3) * 12}
-          r={1.5}
-          fill="#22d3ee"
-          opacity={0.5}
-        />
-      ))}
     </svg>
   );
 }
@@ -72,39 +62,44 @@ export default function BiomechTwinPanel({
   tall = true,
   compact,
   showHud = true,
+  className = "",
 }: BiomechTwinPanelProps) {
-  const { asset, ready } = useAvatarAsset();
   const fat = latchedBody?.fatPercent ?? 22;
   const muscle = latchedBody?.musclePercent ?? 42;
+  const placeholderMode = locked && latchedBody ? "waiting" : "offline";
 
   return (
     <div
       className={`atlant-twin-panel relative overflow-hidden rounded-2xl ${
-        compact ? "h-48" : tall ? "h-[min(52vh,420px)]" : "h-64"
-      }`}
+        compact
+          ? "h-48"
+          : tall
+            ? "h-56 sm:h-64 md:h-72 lg:h-[min(480px,52vh)]"
+            : "h-64"
+      } ${className}`}
     >
       <div className="atlant-twin-bg absolute inset-0" />
       <FloorGrid />
 
       {showHud && (
         <>
-          <div className="atlant-hud-pill absolute left-3 top-3">
+          <div className="atlant-hud-pill absolute left-3 top-3 z-10">
             <span className="h-2 w-2 rounded-full bg-orange-400" />
             Биомеханика
           </div>
-          <div className="atlant-hud-pill absolute right-3 top-3 !border-emerald-200 !text-emerald-700">
+          <div className="atlant-hud-pill absolute right-3 top-3 z-10 !border-emerald-200 !text-emerald-700">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
             В сети
           </div>
           {locked && latchedBody && (
             <>
-              <div className="atlant-hud-tag absolute left-3 bottom-3">
-                [ЖИР: {latchedBody.fatPercent}%]
+              <div className="atlant-hud-tag absolute bottom-3 left-3 z-10">
+                [ЖИР: {fat}%]
               </div>
-              <div className="atlant-hud-tag absolute right-3 bottom-3">
-                [МЫШЦЫ: {latchedBody.musclePercent}%]
+              <div className="atlant-hud-tag absolute bottom-3 right-3 z-10">
+                [МЫШЦЫ: {muscle}%]
               </div>
-              <div className="atlant-hud-tag absolute bottom-3 left-1/2 -translate-x-1/2">
+              <div className="atlant-hud-tag absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
                 [BIOMETRICS: STABLE]
               </div>
             </>
@@ -112,20 +107,17 @@ export default function BiomechTwinPanel({
         </>
       )}
 
-      <div className="relative z-[2] h-full [&>div]:!h-full [&_canvas]:!min-h-full">
-        <AvatarViewer
-          asset={asset}
-          assetReady={ready}
-          showWireframe
-          compositionMode={locked}
-          fatPercent={fat}
-          musclePercent={muscle}
-          tall
-          fillHeight
-          interactive={!compact}
-          theme="light"
+      <div className="relative z-[2] flex h-full items-center justify-center p-4">
+        <TwinPlaceholder
+          mode={placeholderMode}
+          compact={compact}
+          className="h-full w-full border-0 bg-white/40 shadow-none"
         />
       </div>
+
+      {/* 3D twin temporarily disabled — awaiting high-poly static mesh
+      <AvatarViewer asset={asset} ... />
+      */}
     </div>
   );
 }

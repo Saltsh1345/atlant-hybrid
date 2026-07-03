@@ -1,22 +1,20 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import Button from "@/components/ui/Button";
-import AvatarViewer from "@/components/three/AvatarViewer";
 import PoseOverlay from "@/components/camera/PoseOverlay";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
+import TwinPlaceholder from "@/components/visual/TwinPlaceholder";
 import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
-import { useAvatarAsset } from "@/hooks/useAvatarAsset";
 import { useAppStore } from "@/store/useAppStore";
+import { useRef, useEffect, useState } from "react";
 import type { NormalizedLandmark } from "@/types";
 
-/** Полноэкранный живой цифровой двойник — камера + 3D-аватар в реальном времени */
+/** Полноэкранный живой цифровой двойник — камера + заглушка 3D */
 export default function TwinLiveScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[] | null>(null);
-  const { asset } = useAvatarAsset();
   const latchedBody = useAppStore((s) => s.latchedBody);
+  const kinematics = useAppStore((s) => s.kinematics);
   const setPhase = useAppStore((s) => s.setPhase);
 
   const { cameraStatus, cameraError } = useCamera(videoRef, true);
@@ -34,10 +32,10 @@ export default function TwinLiveScreen() {
   }, [tick]);
 
   return (
-    <div className="relative min-h-dvh bg-slate-900">
+    <div className="relative min-h-dvh bg-slate-50">
       <video
         ref={videoRef}
-        className="absolute inset-0 h-full w-full scale-x-[-1] object-cover opacity-50"
+        className="absolute inset-0 h-full w-full scale-x-[-1] object-cover opacity-30"
         playsInline
         muted
         autoPlay
@@ -54,32 +52,34 @@ export default function TwinLiveScreen() {
         <button
           type="button"
           onClick={() => setPhase("dashboard")}
-          className="mb-4 self-start text-sm text-white/80 hover:text-white"
+          className="mb-4 self-start text-sm text-slate-600 hover:text-slate-900"
         >
           ← Дашборд
         </button>
 
-        <h1 className="mb-1 text-xl font-bold text-white">Цифровой двойник</h1>
-        <p className="mb-4 text-xs text-slate-300">Живой режим · синхронизация с камерой</p>
+        <h1 className="mb-1 text-xl font-bold text-slate-900">
+          Цифровой двойник
+        </h1>
+        <p className="mb-4 text-xs text-slate-500">
+          Камера активна · 3D-модель в разработке
+        </p>
 
         {latchedBody && (
-          <p className="mb-3 text-xs text-emerald-300">
-            🔒 Жир {latchedBody.fatPercent}% · Мышцы {latchedBody.musclePercent}%
+          <p className="mb-3 text-xs text-emerald-600">
+            Жир {latchedBody.fatPercent}% · Мышцы {latchedBody.musclePercent}%
           </p>
         )}
 
         <div className="flex-1">
-          <AvatarViewer
-            asset={asset}
-            showWireframe={false}
-            landmarks={landmarks}
-            tall
+          <TwinPlaceholder
+            mode="offline"
+            fatigue={kinematics.fatiguePercent}
+            className="h-full min-h-[320px]"
           />
         </div>
 
-        <p className="mt-4 text-center text-[10px] text-slate-400">
-          Двигайтесь — аватар повторяет позу MediaPipe. Состав тела не
-          пересчитывается.
+        <p className="mt-4 text-center text-[10px] text-slate-500">
+          MediaPipe отслеживает позу. IK-аватар временно отключён.
         </p>
 
         <Button

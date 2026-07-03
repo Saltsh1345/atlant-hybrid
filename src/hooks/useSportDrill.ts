@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DrillCommand, DrillPhase } from "@/lib/training/drillProtocol";
-import { coachSpeak } from "@/lib/ai/speech";
+import { speakScript } from "@/lib/ai/speech";
 import {
   addDrillFixation,
   resetDrillFixations,
@@ -40,7 +40,14 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
 
   const phaseRef = useRef<DrillPhase>("idle");
   const hitRoundRef = useRef(false);
+  const spokenRef = useRef("");
   const command = commands[commandIndex] ?? null;
+
+  const sayOnce = (key: string, text: string, emphasis = false) => {
+    if (spokenRef.current === key) return;
+    spokenRef.current = key;
+    speakScript(key, text, { emphasis });
+  };
 
   const setPhaseSafe = useCallback((p: DrillPhase) => {
     phaseRef.current = p;
@@ -83,7 +90,8 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
         : `Слабый удар ${speed} м/с — точность ${accuracy}%`;
       setFixationText(msg);
       setPhaseSafe("fixation");
-      coachSpeak(
+      sayOnce(
+        `drill:${command.id}:hit`,
         ok
           ? `Удар зафиксирован. ${speed} метров в секунду. Точность ${accuracy} процентов.`
           : `Удар слабый. Скорость ${speed}. Разверните корпус и выпрямите локоть.`
@@ -96,7 +104,7 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
     if (!started || !command) return;
 
     if (phase === "instruction") {
-      coachSpeak(command.voice, { emphasis: true });
+      sayOnce(`drill:${commandIndex}:instruction`, command.voice, true);
       const t = window.setTimeout(() => {
         setCountdown(3);
         setPhaseSafe("countdown");
@@ -109,10 +117,10 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
         hitRoundRef.current = false;
         setActiveSecLeft(command.activeSec);
         setPhaseSafe("active");
-        coachSpeak("Бейте!");
+        sayOnce(`drill:${commandIndex}:go`, "Бейте!");
         return;
       }
-      coachSpeak(String(countdown));
+      sayOnce(`drill:${commandIndex}:count:${countdown}`, String(countdown));
       const t = window.setTimeout(() => setCountdown((c) => c - 1), 900);
       return () => window.clearTimeout(t);
     }
@@ -152,7 +160,8 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
       const t = window.setTimeout(() => {
         if (commandIndex + 1 >= commands.length) {
           setPhaseSafe("complete");
-          coachSpeak(
+          sayOnce(
+            "drill:complete",
             "Серия завершена. Нажмите «Анализ» для отчёта и плана тренировки."
           );
           return;

@@ -7,12 +7,16 @@ import type { WorkoutPlan } from "@/lib/ai/workoutPlan";
 export default function AiPlanCard({
   plan,
   onStart,
+  className = "",
 }: {
   plan: WorkoutPlan;
   onStart: () => void;
+  className?: string;
 }) {
   return (
-    <Card className="mb-4 border-sky-100 bg-gradient-to-br from-white to-sky-50">
+    <Card
+      className={`border-sky-100 bg-gradient-to-br from-white to-sky-50 md:p-5 ${className}`}
+    >
       <p className="text-xs font-medium uppercase tracking-wide text-primary">
         План на сегодня
       </p>

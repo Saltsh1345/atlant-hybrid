@@ -2,7 +2,7 @@ import type { CalibrationStep } from "@/types";
 import type { NormalizedLandmark } from "@/types";
 import { analyzePoseLive } from "@/lib/calibration/poseAnalysis";
 
-const HOLD_FRAMES = 12;
+const HOLD_FRAMES = 8;
 
 export function poseGuideProgress(
   step: CalibrationStep,
@@ -18,20 +18,36 @@ export function checkPoseGuide(
   return analyzePoseLive(step, landmarks).accepted;
 }
 
+/** Skip current pose wait (manual bypass). */
+let skipPoseWait = false;
+
+export function requestPoseSkip(): void {
+  skipPoseWait = true;
+}
+
+export function resetPoseSkip(): void {
+  skipPoseWait = false;
+}
+
 export { isPoseGuideStep, poseGuideHint } from "@/lib/calibration/poseAnalysis";
 
-/** Waits until camera confirms pose — no timeout, no auto-skip. */
 export function waitForLivePose(
   step: CalibrationStep,
   getLandmarks: () => NormalizedLandmark[] | null,
   onTick?: (progress: number, feedback: string, metrics: string) => void,
   onNudge?: (feedback: string) => void
 ): Promise<void> {
+  skipPoseWait = false;
   return new Promise((resolve) => {
     let hold = 0;
     let lastNudge = Date.now();
 
     const tick = () => {
+      if (skipPoseWait) {
+        skipPoseWait = false;
+        resolve();
+        return;
+      }
       const lm = getLandmarks();
       const analysis = analyzePoseLive(step, lm);
       onTick?.(analysis.progress, analysis.feedback, analysis.metrics);
@@ -44,7 +60,7 @@ export function waitForLivePose(
         }
       } else {
         hold = 0;
-        if (Date.now() - lastNudge > 7000) {
+        if (Date.now() - lastNudge > 12000) {
           lastNudge = Date.now();
           onNudge?.(analysis.feedback);
         }

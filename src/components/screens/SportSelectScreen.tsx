@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import SportPicker from "@/components/training/SportPicker";
 import { useAppStore } from "@/store/useAppStore";
-import { speak } from "@/lib/ai/speech";
+import { speakGuidance } from "@/lib/ai/speech";
 import type { Sport, StrengthExercise } from "@/types";
 
 export default function SportSelectScreen() {
@@ -16,7 +16,11 @@ export default function SportSelectScreen() {
   const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
 
   useEffect(() => {
-    speak("Выберите спорт: бокс, теннис или силовые.");
+    speakGuidance(
+      "sport-select:intro",
+      "Выберите спорт: бокс, теннис или силовые.",
+      { cooldownMs: 60000 }
+    );
   }, []);
 
   const startTraining = (sport: Sport, exercise?: StrengthExercise) => {

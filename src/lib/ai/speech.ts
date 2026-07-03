@@ -1,5 +1,7 @@
 let speaking = false;
 let voiceMuted = false;
+let lastGuidanceKey = "";
+let lastGuidanceAt = 0;
 
 export function setVoiceMuted(muted: boolean): void {
   voiceMuted = muted;
@@ -40,6 +42,40 @@ export function speak(
   window.speechSynthesis.speak(utter);
 }
 
+/**
+ * Guided voice — one cue per key within cooldown; skips if already speaking.
+ * Returns true if speech was started.
+ */
+export function speakGuidance(
+  key: string,
+  text: string,
+  opts?: {
+    cooldownMs?: number;
+    force?: boolean;
+    onEnd?: () => void;
+    rate?: number;
+  }
+): boolean {
+  if (voiceMuted) {
+    opts?.onEnd?.();
+    return false;
+  }
+  const cooldown = opts?.cooldownMs ?? 12000;
+  const now = Date.now();
+
+  if (!opts?.force) {
+    if (isSpeaking()) return false;
+    if (key === lastGuidanceKey && now - lastGuidanceAt < cooldown) {
+      return false;
+    }
+  }
+
+  lastGuidanceKey = key;
+  lastGuidanceAt = now;
+  speak(text, { rate: opts?.rate ?? 0.94, onEnd: opts?.onEnd });
+  return true;
+}
+
 export function stopSpeaking(): void {
   if (typeof window !== "undefined") {
     window.speechSynthesis.cancel();
@@ -48,26 +84,28 @@ export function stopSpeaking(): void {
 }
 
 export function isSpeaking(): boolean {
+  if (typeof window !== "undefined" && window.speechSynthesis.speaking) {
+    return true;
+  }
   return speaking;
 }
 
-const COACH_OPENERS = [
-  "Слушайте внимательно.",
-  "Отлично, продолжаем.",
-  "Хорошо, идём дальше.",
-  "Супер, вы на правильном пути.",
-  "Класс, держим темп.",
-];
+/** Script lines (calibration, drill) — clear speech, no random filler. */
+export function speakScript(
+  key: string,
+  text: string,
+  opts?: { emphasis?: boolean; onEnd?: () => void }
+): void {
+  speakGuidance(key, text, {
+    force: true,
+    rate: opts?.emphasis ? 0.9 : 0.94,
+    onEnd: opts?.onEnd,
+  });
+}
 
 export function coachSpeak(
   text: string,
   opts?: { emphasis?: boolean; onEnd?: () => void }
 ): void {
-  const opener =
-    Math.random() > 0.55
-      ? COACH_OPENERS[Math.floor(Math.random() * COACH_OPENERS.length)] + " "
-      : "";
-  const rate = opts?.emphasis ? 0.88 : 0.9 + Math.random() * 0.1;
-  const pitch = opts?.emphasis ? 1.08 : 1.02 + Math.random() * 0.14;
-  speak(`${opener}${text}`, { rate, pitch, volume: 0.95, onEnd: opts?.onEnd });
+  speakScript(`coach:${text.slice(0, 32)}`, text, opts);
 }

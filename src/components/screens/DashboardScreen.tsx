@@ -3,25 +3,17 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
-import VelocityChart from "@/components/charts/VelocityChart";
-import ProgressChart from "@/components/charts/ProgressChart";
 import PwaInstallBanner from "@/components/pwa/PwaInstallBanner";
-import DigitalTwinCard from "@/components/dashboard/DigitalTwinCard";
-import MuscleReadinessCard from "@/components/dashboard/MuscleReadinessCard";
-import AiPlanCard from "@/components/dashboard/AiPlanCard";
+import DashboardDesktopGrid from "@/components/dashboard/DashboardDesktopGrid";
+import {
+  buildDashboardWidgets,
+  DashboardMobileLayout,
+  type DashboardWidgetContext,
+} from "@/components/dashboard/DashboardWidgets";
 import { useAppStore } from "@/store/useAppStore";
 import { computeMuscleReadiness } from "@/lib/readiness";
 import { generateWorkoutPlan } from "@/lib/ai/workoutPlan";
-import { exerciseLabel } from "@/lib/pose/exercises";
-import { formScoreLabel } from "@/lib/pose/formScore";
-import type { Sport, FitnessGoal } from "@/types";
-
-const SPORT_NAMES: Record<Sport, string> = {
-  strength: "Силовые",
-  boxing: "Бокс",
-  tennis: "Теннис",
-};
+import type { FitnessGoal } from "@/types";
 
 const GOAL_NAMES: Record<FitnessGoal, string> = {
   lose_weight: "Похудение",
@@ -29,15 +21,6 @@ const GOAL_NAMES: Record<FitnessGoal, string> = {
   maintain: "Поддержание",
   performance: "Результат",
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default function DashboardScreen() {
   const profile = useAppStore((s) => s.profile);
@@ -95,30 +78,74 @@ export default function DashboardScreen() {
     setPhase("calibration");
   };
 
+  const widgetCtx: DashboardWidgetContext = useMemo(
+    () => ({
+      bodyDataLocked,
+      latchedBody,
+      readiness,
+      plan,
+      geminiOk,
+      lastSession,
+      sessionHistory,
+      showBodyTiles: !bodyDataLocked,
+      onScan: goToScan,
+      onTraining: () => setPhase("sport-select"),
+      onTwinLive: bodyDataLocked ? () => setPhase("twin-live") : undefined,
+      exportData,
+      exportMsg,
+    }),
+    [
+      bodyDataLocked,
+      latchedBody,
+      readiness,
+      plan,
+      geminiOk,
+      lastSession,
+      sessionHistory,
+      exportMsg,
+      setPhase,
+    ]
+  );
+
+  const { widgets, availableToAdd } = useMemo(
+    () => buildDashboardWidgets(widgetCtx),
+    [widgetCtx]
+  );
+
   return (
     <motion.div
-      className="mx-auto min-h-dvh max-w-lg bg-gradient-to-b from-white to-cyan-50/30 px-5 py-8"
+      className="mx-auto min-h-dvh w-full max-w-7xl bg-gradient-to-b from-white to-cyan-50/30 px-4 py-6 pb-24 sm:px-6 md:py-8 lg:px-8 lg:py-10"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <header className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-sky-600 text-xs font-black text-white">
+      <header className="mb-6 lg:mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-sky-600 text-sm font-black text-white shadow-md sm:h-11 sm:w-11">
               A
             </span>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-700">
                 Atlant Hybrid
               </p>
-              <h1 className="text-xl font-bold text-slate-900">Дашборд</h1>
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl lg:text-3xl">
+                Дашборд
+              </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <span className="atlant-hud-pill !py-1 !text-[9px] !text-emerald-700">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               В сети
             </span>
+            <Button
+              size="md"
+              className="!w-auto hidden sm:inline-flex lg:hidden"
+              onClick={() => setPhase("sport-select")}
+            >
+              Тренировка
+            </Button>
             <button
               type="button"
               onClick={() => setPhase("settings")}
@@ -129,8 +156,9 @@ export default function DashboardScreen() {
             </button>
           </div>
         </div>
+
         {profile && (
-          <p className="font-mono text-xs text-cyan-800/80">
+          <p className="mt-3 font-mono text-[10px] text-cyan-800/80 sm:text-xs">
             [ПРОФИЛЬ · {profile.height}см · {profile.weight}кг · {profile.age}л
             {profile.goal && GOAL_NAMES[profile.goal]
               ? ` · ${GOAL_NAMES[profile.goal]}`
@@ -142,152 +170,17 @@ export default function DashboardScreen() {
 
       <PwaInstallBanner />
 
-      <DigitalTwinCard
-        bodyDataLocked={bodyDataLocked}
-        latchedBody={latchedBody}
-        onScan={goToScan}
-        onOpenLive={
-          bodyDataLocked ? () => setPhase("twin-live") : undefined
-        }
-      />
-
-      <MuscleReadinessCard report={readiness} />
-
-      {plan && (
-        <AiPlanCard plan={plan} onStart={() => setPhase("sport-select")} />
-      )}
-
-      <div className="mb-4 grid grid-cols-2 gap-3">
-        <div className="atlant-metric-card p-4 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">
-            Жировая масса
-          </p>
-          <p className="mt-1 text-3xl font-bold text-amber-500">
-            {bodyDataLocked && latchedBody
-              ? `${latchedBody.fatPercent}%`
-              : "—"}
-          </p>
-          {bodyDataLocked && latchedBody && (
-            <p className="text-[10px] text-amber-700/80">
-              {latchedBody.fatMassKg} кг
-            </p>
-          )}
-          {bodyDataLocked && (
-            <p className="mt-1 font-mono text-[9px] text-emerald-600">[LOCKED]</p>
-          )}
-        </div>
-        <div className="atlant-metric-card p-4 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
-            Мышечная масса
-          </p>
-          <p className="mt-1 text-3xl font-bold text-emerald-500">
-            {bodyDataLocked && latchedBody
-              ? `${latchedBody.musclePercent}%`
-              : "—"}
-          </p>
-          {bodyDataLocked && (
-            <p className="mt-1 font-mono text-[9px] text-emerald-600">[LOCKED]</p>
-          )}
-        </div>
+      {/* Планшет и телефон — фиксированная сетка */}
+      <div className="lg:hidden">
+        <DashboardMobileLayout ctx={widgetCtx} />
       </div>
 
-      {sessionHistory.length >= 2 && (
-        <ProgressChart history={sessionHistory} />
-      )}
-
-      <div className="atlant-metric-card mb-4 p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700">
-          Мониторинг · VBT
-        </p>
-        <p className="mt-2 text-xs text-slate-500">
-          {bodyDataLocked
-            ? "Пульс, скорость, мощность и усталость — во время тренировки"
-            : "Тренировка доступна сразу. Скан тела — для цифрового двойника"}
-        </p>
-        {geminiOk !== null && (
-          <p className="mt-2 font-mono text-[10px] text-slate-400">
-            [GEMINI: {geminiOk ? "ONLINE" : "LOCAL FALLBACK"}]
-          </p>
-        )}
-      </div>
-
-      {lastSession && (
-        <Card className="mb-4">
-          <p className="text-xs font-medium text-primary">Последняя тренировка</p>
-          <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-            <span>
-              {lastSession.exercise
-                ? exerciseLabel(lastSession.exercise)
-                : SPORT_NAMES[lastSession.sport]}
-            </span>
-            <span>{lastSession.durationSec} сек</span>
-            <span>Ø {lastSession.avgVelocity} м/с</span>
-            {lastSession.formScore != null && lastSession.formScore > 0 && (
-              <span>
-                Техника {lastSession.formScore}% (
-                {formScoreLabel(lastSession.formScore)})
-              </span>
-            )}
-            {lastSession.reps != null && lastSession.reps > 0 && (
-              <span>{lastSession.reps} повт.</span>
-            )}
-            {lastSession.punches != null && lastSession.punches > 0 && (
-              <span>{lastSession.punches} удар.</span>
-            )}
-            {lastSession.swings != null && lastSession.swings > 0 && (
-              <span>{lastSession.swings} замах.</span>
-            )}
-          </div>
-          <div className="mt-3">
-            <VelocityChart samples={lastSession.samples} />
-          </div>
-          <p className="mt-3 text-sm leading-relaxed text-slate-600">
-            {lastSession.aiAnalysis}
-          </p>
-        </Card>
-      )}
-
-      {sessionHistory.length > 1 && (
-        <Card className="mb-4">
-          <p className="mb-3 text-xs font-medium text-muted uppercase tracking-wide">
-            История
-          </p>
-          <ul className="space-y-2">
-            {sessionHistory.slice(1, 6).map((s, i) => (
-              <li
-                key={`${s.completedAt}-${i}`}
-                className="flex items-center justify-between border-b border-slate-100 pb-2 text-sm last:border-0"
-              >
-                <span className="text-slate-700">
-                  {s.exercise
-                    ? exerciseLabel(s.exercise)
-                    : SPORT_NAMES[s.sport]}
-                  {s.reps ? ` · ${s.reps} повт.` : ""}
-                  {s.punches ? ` · ${s.punches} уд.` : ""}
-                  {s.swings ? ` · ${s.swings} зам.` : ""}
-                  {s.formScore ? ` · ${s.formScore}%` : ""}
-                </span>
-                <span className="text-xs text-muted">
-                  {formatDate(s.completedAt)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      <div className="space-y-3">
-        <Button size="lg" onClick={() => setPhase("sport-select")}>
-          Начать тренировку
-        </Button>
-        <Button size="lg" variant="secondary" onClick={goToScan}>
-          {bodyDataLocked ? "Пересканировать тело" : "Скан тела (опционально)"}
-        </Button>
-        {sessionHistory.length > 0 && (
-          <Button size="lg" variant="ghost" onClick={exportData}>
-            Экспорт данных {exportMsg && `· ${exportMsg}`}
-          </Button>
-        )}
+      {/* Монитор — drag & resize */}
+      <div className="hidden lg:block">
+        <DashboardDesktopGrid
+          widgets={widgets}
+          availableToAdd={availableToAdd}
+        />
       </div>
     </motion.div>
   );

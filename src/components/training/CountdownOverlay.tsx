@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { speak } from "@/lib/ai/speech";
+import { speakScript } from "@/lib/ai/speech";
 
 interface CountdownOverlayProps {
   onComplete: () => void;
@@ -13,11 +13,11 @@ export default function CountdownOverlay({ onComplete }: CountdownOverlayProps) 
 
   useEffect(() => {
     if (count === 0) {
-      speak("Старт!");
+      speakScript("countdown:start", "Старт!");
       onComplete();
       return;
     }
-    speak(String(count));
+    speakScript(`countdown:${count}`, String(count));
     const t = setTimeout(() => setCount((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [count, onComplete]);

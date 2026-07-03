@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import BiomechTwinPanel from "@/components/visual/BiomechTwinPanel";
 import LiveScanGrid from "@/components/visual/LiveScanGrid";
 import MuscleFatOverlay from "@/components/camera/MuscleFatOverlay";
+import AutoFrameViewport from "@/components/camera/AutoFrameViewport";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import CalibrationProgress from "@/components/calibration/CalibrationProgress";
 import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
@@ -15,9 +16,10 @@ import {
   isPoseGuideStep,
   poseGuideHint,
   waitForLivePose,
+  requestPoseSkip,
 } from "@/lib/calibration/poseGuide";
 import { analyzeScanFrame, type ScanAnalysis } from "@/lib/calibration/scanAnalysis";
-import { coachSpeak, stopSpeaking } from "@/lib/ai/speech";
+import { speakScript, speakGuidance, stopSpeaking } from "@/lib/ai/speech";
 import type { CalibrationStep, NormalizedLandmark } from "@/types";
 
 export default function CalibrationScreen() {
@@ -43,20 +45,26 @@ export default function CalibrationScreen() {
   const setCalibrationStep = useAppStore((s) => s.setCalibrationStep);
   const resetCalibration = useAppStore((s) => s.resetCalibration);
   const unlockForRescan = useAppStore((s) => s.unlockForRescan);
-  const rescanPending = useAppStore((s) => s.rescanPending);
   const clearRescanPending = useAppStore((s) => s.clearRescanPending);
+  const ensureProfile = useAppStore((s) => s.ensureProfile);
 
   const { cameraStatus, cameraError } = useCamera(videoRef, true);
   const { tick, poseReady, poseError } = usePoseTracker(videoRef, true);
 
   useEffect(() => {
     resetCalibration();
-    if (rescanPending) {
+    const pending = useAppStore.getState().rescanPending;
+    if (pending) {
       unlockForRescan();
       clearRescanPending();
     }
     return () => stopSpeaking();
-  }, [resetCalibration, rescanPending, unlockForRescan, clearRescanPending]);
+    // Mount-only: store actions are stable; avoid re-running reset on each render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const tickRef = useRef(tick);
+  tickRef.current = tick;
 
   useEffect(() => {
     if (!running) return;
@@ -72,22 +80,39 @@ export default function CalibrationScreen() {
 
   useEffect(() => {
     let raf: number;
+    let frame = 0;
     const loop = () => {
-      const lm = tick();
+      const lm = tickRef.current();
       if (lm) {
         landmarksRef.current = lm;
-        setLandmarks(lm);
+        frame += 1;
+        // ~15fps UI updates — enough for overlays, avoids render storm
+        if (frame % 4 === 0) {
+          setLandmarks(lm);
+        }
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [tick]);
+  }, []);
 
   const speakAsync = (text: string, emphasis = false) =>
     new Promise<void>((resolve) =>
-      coachSpeak(text, { emphasis, onEnd: resolve })
+      speakScript(`cal:line:${text.slice(0, 40)}`, text, {
+        emphasis,
+        onEnd: resolve,
+      })
     );
+
+  const distanceVoiceSteps: CalibrationStep[] = [
+    "idle",
+    "scan_start",
+    "body_analysis",
+    "clothing_check",
+  ];
+  const autoFrameVoice =
+    distanceVoiceSteps.includes(calibrationStep) && !showComposition;
 
   const waitCameraPose = async (step: CalibrationStep) => {
     setPoseOk(false);
@@ -102,7 +127,8 @@ export default function CalibrationScreen() {
         setPoseOk(progress >= 0.88);
       },
       (feedback) => {
-        coachSpeak(feedback, { emphasis: true });
+        if (distanceVoiceSteps.includes(step)) return;
+        speakGuidance(`cal:pose:${step}`, feedback, { cooldownMs: 12000 });
       }
     );
     setPoseOk(true);
@@ -110,6 +136,7 @@ export default function CalibrationScreen() {
 
   const runScript = useCallback(async () => {
     if (running) return;
+    ensureProfile();
     setRunning(true);
     setShowComposition(false);
     setScanStatus("Камера анализирует…");
@@ -176,33 +203,32 @@ export default function CalibrationScreen() {
     setShowComposition(true);
     setGuideHint("");
     setRunning(false);
-  }, [running, latchBodyData, setCalibrationStep]);
+  }, [running, latchBodyData, setCalibrationStep, ensureProfile]);
 
   const scanning = running && !showComposition;
 
   return (
     <div className="relative min-h-dvh bg-slate-100">
-      <video
-        ref={videoRef}
-        className={`absolute inset-0 h-full w-full scale-x-[-1] object-contain ${
-          showComposition ? "hidden" : "w-full"
-        }`}
-        playsInline
-        muted
-        autoPlay
-      />
-
-      <LiveScanGrid active={scanning} />
-      {scanning && (
-        <div className="scan-sweep-wrap">
-          <div className="scan-sweep" />
-        </div>
+      {!showComposition && (
+        <AutoFrameViewport
+          videoRef={videoRef}
+          landmarks={landmarks}
+          active={cameraStatus === "ready" && poseReady}
+          voiceNudges={autoFrameVoice}
+        >
+          <LiveScanGrid active={scanning} />
+          {scanning && (
+            <div className="scan-sweep-wrap">
+              <div className="scan-sweep" />
+            </div>
+          )}
+          <MuscleFatOverlay
+            landmarks={landmarks}
+            active={scanning}
+            sweepPhase={sweepPhase}
+          />
+        </AutoFrameViewport>
       )}
-      <MuscleFatOverlay
-        landmarks={landmarks}
-        active={scanning}
-        sweepPhase={sweepPhase}
-      />
 
       <CameraStatusOverlay
         cameraStatus={cameraStatus}
@@ -286,6 +312,18 @@ export default function CalibrationScreen() {
             >
               {scanStatus || guideHint}
             </p>
+            {!poseOk && (
+              <button
+                type="button"
+                onClick={() => {
+                  requestPoseSkip();
+                  setScanStatus("Шаг пропущен — продолжаем");
+                }}
+                className="mt-2 w-full text-center text-xs text-slate-500 underline"
+              >
+                Пропустить шаг →
+              </button>
+            )}
           </div>
         )}
 

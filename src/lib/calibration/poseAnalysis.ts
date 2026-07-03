@@ -85,10 +85,10 @@ export function analyzePoseLive(
       };
     }
     case "turn_left": {
-      const depthScore = clamp01((depth - 0.015) / 0.07);
-      const narrowScore = clamp01((0.24 - w) / 0.14);
+      const depthScore = clamp01((depth - 0.01) / 0.06);
+      const narrowScore = clamp01((0.26 - w) / 0.16);
       const progress = depthScore * 0.55 + narrowScore * 0.45;
-      const accepted = progress >= 0.88 && depth > 0.02;
+      const accepted = progress >= 0.75 && depth > 0.012;
       return {
         progress,
         accepted,
@@ -101,10 +101,10 @@ export function analyzePoseLive(
       };
     }
     case "turn_right": {
-      const depthScore = clamp01((-depth - 0.015) / 0.07);
-      const narrowScore = clamp01((0.24 - w) / 0.14);
+      const depthScore = clamp01((-depth - 0.01) / 0.06);
+      const narrowScore = clamp01((0.26 - w) / 0.16);
       const progress = depthScore * 0.55 + narrowScore * 0.45;
-      const accepted = progress >= 0.88 && depth < -0.02;
+      const accepted = progress >= 0.75 && depth < -0.012;
       return {
         progress,
         accepted,
@@ -123,11 +123,11 @@ export function analyzePoseLive(
       const widthScore = clamp01((w - 0.11) / 0.14);
       const progress = yawScore * 0.45 + depthScore * 0.25 + widthScore * 0.3;
       const facing =
-        Math.abs(yawX) < 0.045 &&
-        w > 0.12 &&
-        w < 0.34 &&
-        Math.abs(depth) < 0.07;
-      const accepted = facing && progress >= 0.72;
+        Math.abs(yawX) < 0.055 &&
+        w > 0.1 &&
+        w < 0.36 &&
+        Math.abs(depth) < 0.09;
+      const accepted = facing && progress >= 0.65;
       let feedback = "Встаньте лицом к камере — плечи параллельно";
       if (accepted) feedback = "✓ Лицом к камере";
       else if (w < 0.12)
@@ -160,10 +160,10 @@ export function analyzePoseLive(
       };
     }
     case "squat": {
-      const profileOk = w < 0.16 ? 1 : clamp01((0.22 - w) / 0.1);
-      const squatScore = clamp01((155 - knee) / 55);
-      const progress = profileOk * 0.3 + squatScore * 0.7;
-      const accepted = profileOk > 0.8 && knee < 115 && knee > 70;
+      const profileOk = w < 0.18 ? 1 : clamp01((0.24 - w) / 0.12);
+      const squatScore = clamp01((150 - knee) / 50);
+      const progress = profileOk * 0.25 + squatScore * 0.75;
+      const accepted = knee < 125 && knee > 65 && progress >= 0.7;
       return {
         progress,
         accepted,
