@@ -19,7 +19,6 @@ import {
   applyCompositionVertexMaterials,
   applyCriticalMuscleMaterials,
   applyIdleAnatomicalMaterials,
-  applyScanWireframe,
 } from "@/lib/three/compositionMaterials";
 import { normalizeMeshName } from "@/lib/three/muscleGroups";
 import AvatarFloorGrid from "@/components/three/AvatarFloorGrid";
@@ -54,22 +53,20 @@ function applyStaticPose(group: THREE.Object3D, rig: RigPose, lerp = 0.2): void 
 function SceneAvatar({
   scene,
   rig,
-  scanMode,
   compositionMode,
   fatPercent,
   musclePercent,
-  lightTheme,
+  fatZones,
   criticalMeshes,
   idleAnimate,
   onModelKind,
 }: {
   scene: THREE.Object3D;
   rig: RigPose;
-  scanMode: boolean;
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
-  lightTheme?: boolean;
+  fatZones?: import("@/types").FatZoneMap;
   criticalMeshes?: string[];
   idleAnimate?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
@@ -109,15 +106,15 @@ function SceneAvatar({
         fatPercent,
         musclePercent,
         compositionKnown: !!compositionMode,
+        fatZones,
       });
     } else if (compositionMode) {
       applyCompositionVertexMaterials(
         prepared.object,
         fatPercent ?? 20,
-        musclePercent ?? 40
+        musclePercent ?? 40,
+        fatZones
       );
-    } else if (scanMode) {
-      applyScanWireframe(prepared.object, lightTheme);
     } else {
       applyIdleAnatomicalMaterials(prepared.object);
     }
@@ -134,11 +131,10 @@ function SceneAvatar({
     }
   }, [
     prepared,
-    scanMode,
     compositionMode,
     fatPercent,
     musclePercent,
-    lightTheme,
+    fatZones,
     criticalMeshes,
   ]);
 
@@ -268,22 +264,20 @@ function AvatarLoader() {
 function AvatarScene({
   asset,
   rig,
-  scanMode,
   compositionMode,
   fatPercent,
   musclePercent,
-  lightTheme,
+  fatZones,
   criticalMeshes,
   idleAnimate,
   onModelKind,
 }: {
   asset: AvatarAsset | null;
   rig: RigPose;
-  scanMode: boolean;
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
-  lightTheme?: boolean;
+  fatZones?: import("@/types").FatZoneMap;
   criticalMeshes?: string[];
   idleAnimate?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
@@ -299,11 +293,10 @@ function AvatarScene({
       <FbxModel
         url={asset.url}
         rig={rig}
-        scanMode={scanMode}
         compositionMode={compositionMode}
         fatPercent={fatPercent}
         musclePercent={musclePercent}
-        lightTheme={lightTheme}
+        fatZones={fatZones}
         criticalMeshes={criticalMeshes}
         idleAnimate={idleAnimate}
         onModelKind={onModelKind}
@@ -315,11 +308,10 @@ function AvatarScene({
     <GlbModel
       url={asset.url}
       rig={rig}
-      scanMode={scanMode}
       compositionMode={compositionMode}
       fatPercent={fatPercent}
       musclePercent={musclePercent}
-      lightTheme={lightTheme}
+      fatZones={fatZones}
       criticalMeshes={criticalMeshes}
       idleAnimate={idleAnimate}
       onModelKind={onModelKind}
@@ -338,6 +330,7 @@ export interface AvatarViewerInnerProps {
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
+  fatZones?: import("@/types").FatZoneMap;
   /** Mesh names to highlight red (poor technique). */
   criticalMeshes?: string[];
   idleAnimate?: boolean;
@@ -357,6 +350,7 @@ export default function AvatarViewerInner({
   compositionMode = false,
   fatPercent,
   musclePercent,
+  fatZones,
   criticalMeshes,
   idleAnimate = true,
   landmarks = null,
@@ -369,7 +363,6 @@ export default function AvatarViewerInner({
     [landmarks]
   );
 
-  const lightTheme = theme === "light";
   const heightClass = fillHeight
     ? "h-full min-h-[12rem]"
     : compact
@@ -377,29 +370,22 @@ export default function AvatarViewerInner({
       : tall
         ? "h-52"
         : "h-48";
-  const shellClass = lightTheme
-    ? "bg-gradient-to-b from-slate-50 to-cyan-50/80"
-    : "bg-gradient-to-b from-slate-700 to-slate-900";
-  const canvasBg = lightTheme ? "#f0f9ff" : "#1e293b";
+  const canvasBg = "#0b1220";
   const camZ = compositionMode || (criticalMeshes?.length ?? 0) > 0 ? 3.6 : 3.2;
   const camY = 0.95;
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-2xl ${shellClass} ${heightClass}`}
+      className={`relative w-full overflow-hidden rounded-2xl bg-gradient-to-b from-slate-950 to-slate-900 ${heightClass}`}
       style={fillHeight ? { minHeight: 220 } : undefined}
     >
       {!assetReady && (
-        <div
-          className={`absolute inset-0 z-10 flex items-center justify-center ${
-            lightTheme ? "bg-white/80" : "bg-slate-900/80"
-          }`}
-        >
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/90">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
         </div>
       )}
       <Canvas
-        gl={{ antialias: true, alpha: true, powerPreference: "default" }}
+        gl={{ antialias: true, alpha: false, powerPreference: "default" }}
         camera={{
           position: [0, camY, camZ],
           fov: 36,
@@ -416,40 +402,24 @@ export default function AvatarViewerInner({
         resize={{ scroll: false, debounce: 100 }}
       >
         <color attach="background" args={[canvasBg]} />
-        <ambientLight intensity={lightTheme ? 1.6 : 1.3} />
-        <directionalLight
-          position={[3, 5, 4]}
-          intensity={lightTheme ? 1.5 : 1.9}
-        />
-        <directionalLight
-          position={[-3, 2, -2]}
-          intensity={lightTheme ? 0.65 : 0.85}
-        />
+        <ambientLight intensity={0.55} />
+        <directionalLight position={[2.5, 4.5, 3]} intensity={1.8} color="#e0f2fe" />
+        <directionalLight position={[-2.5, 2, -1.5]} intensity={0.7} color="#38bdf8" />
         <pointLight
-          position={[0, 2.2, 1.2]}
-          intensity={criticalMeshes?.length ? 1.2 : 0.6}
+          position={[0, 2.4, 1.4]}
+          intensity={criticalMeshes?.length ? 1.1 : 0.85}
           color={criticalMeshes?.length ? "#ef4444" : "#22d3ee"}
         />
-        <hemisphereLight
-          args={
-            lightTheme
-              ? ["#ffffff", "#e0f2fe", 0.85]
-              : ["#e2e8f0", "#334155", 0.65]
-          }
-        />
-        <AvatarFloorGrid
-          lightTheme={lightTheme}
-          pulse={(criticalMeshes?.length ?? 0) > 0}
-        />
+        <hemisphereLight args={["#94a3b8", "#0f172a", 0.45]} />
+        <AvatarFloorGrid pulse={(criticalMeshes?.length ?? 0) > 0} />
         <Suspense fallback={<AvatarLoader />}>
           <AvatarScene
             asset={asset}
             rig={rig}
-            scanMode={showWireframe}
             compositionMode={compositionMode}
             fatPercent={fatPercent}
             musclePercent={musclePercent}
-            lightTheme={lightTheme}
+            fatZones={fatZones}
             criticalMeshes={criticalMeshes}
             idleAnimate={idleAnimate}
             onModelKind={onModelKind}

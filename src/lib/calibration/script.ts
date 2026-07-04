@@ -4,57 +4,59 @@ export interface ScriptLine {
   step: CalibrationStep;
   text: string;
   durationMs: number;
+  /** Collect pose samples during this step */
+  sample?: boolean;
+  /** Wait for pose guide before continuing */
+  poseGuide?: boolean;
 }
 
+/**
+ * Laptop webcam scan: upper body close → arms up → slow 360 → step back → squat.
+ * Short, no long filming.
+ */
 export const CALIBRATION_SCRIPT: ScriptLine[] = [
   {
-    step: "scan_start",
-    text: "Встаньте в полный рост лицом к камере. Отойдите, чтобы были видны голова и ступни.",
+    step: "upper_body",
+    text: "Подойдите ближе. В кадре — голова, плечи и торс. Руки вдоль тела.",
+    durationMs: 2800,
+    poseGuide: true,
+    sample: true,
+  },
+  {
+    step: "arms_up",
+    text: "Поднимите руки вверх, чтобы кисти были в кадре. Не уходите назад.",
+    durationMs: 2500,
+    poseGuide: true,
+    sample: true,
+  },
+  {
+    step: "rotate_360",
+    text: "Медленно повернитесь на месте на 360 градусов. Руки вверх, не торопитесь.",
+    durationMs: 9000,
+    sample: true,
+  },
+  {
+    step: "step_back",
+    text: "Отойдите на шаг назад, чтобы в кадре появились бёдра и колени.",
+    durationMs: 3000,
+    poseGuide: true,
+    sample: true,
+  },
+  {
+    step: "squat_lower",
+    text: "Медленно присядьте и встаньте. Камера смотрит на колени и бёдра.",
     durationMs: 4000,
+    poseGuide: true,
+    sample: true,
   },
   {
-    step: "body_analysis",
-    text: "Сканирую силуэт. Не двигайтесь — полоса пройдёт по телу и подсветит зоны.",
-    durationMs: 4500,
-  },
-  {
-    step: "clothing_check",
-    text: "Проверяю одежду — плечи, торс и бёдра должны быть видны.",
-    durationMs: 3500,
-  },
-  {
-    step: "turn_left",
-    text: "Повернитесь налево — покажите левый бок и бицепс.",
-    durationMs: 4000,
-  },
-  {
-    step: "turn_right",
-    text: "Повернитесь направо — правый бок, задержитесь.",
-    durationMs: 4000,
-  },
-  {
-    step: "center",
-    text: "Вернитесь лицом к камере, полный рост.",
-    durationMs: 3500,
-  },
-  {
-    step: "profile_turn",
-    text: "Повернитесь боком к камере — профиль, в полный рост.",
-    durationMs: 4000,
-  },
-  {
-    step: "squat",
-    text: "Не поворачиваясь — медленно присядьте. Камера должна видеть угол колена и мышцы бедра.",
-    durationMs: 5000,
-  },
-  {
-    step: "biomech_ready",
-    text: "Фиксирую состав тела и биомеханику. Data Latch активирован.",
-    durationMs: 3500,
+    step: "analyzing",
+    text: "Отправляю скан в Gemini. Строю двойника по анализу тела.",
+    durationMs: 1200,
   },
   {
     step: "visualization",
-    text: "Смотрите на двойника справа: жир — янтарный на торсе, мышцы — зелёные на конечностях.",
-    durationMs: 5000,
+    text: "Готово. Жир на двойнике — там, где указал анализ, без лишних зон на руках.",
+    durationMs: 2500,
   },
 ];

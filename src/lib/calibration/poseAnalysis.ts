@@ -159,22 +159,83 @@ export function analyzePoseLive(
         metrics: `плечи ${w.toFixed(2)} · рост ${full.score.toFixed(2)}`,
       };
     }
-    case "squat": {
-      const profileOk = w < 0.18 ? 1 : clamp01((0.24 - w) / 0.12);
+    case "squat":
+    case "squat_lower": {
       const squatScore = clamp01((150 - knee) / 50);
-      const progress = profileOk * 0.25 + squatScore * 0.75;
-      const accepted = knee < 125 && knee > 65 && progress >= 0.7;
+      const progress = squatScore;
+      const accepted = knee < 130 && knee > 60 && progress >= 0.55;
       return {
         progress,
         accepted,
         feedback: accepted
-          ? `✓ Присед принят · колено ${Math.round(knee)}°`
-          : profileOk < 0.6
-            ? "Оставайтесь боком к камере"
-            : knee > 130
-              ? `Присядьте глубже · сейчас ${Math.round(knee)}°`
-              : `Держите присед · колено ${Math.round(knee)}°`,
-        metrics: `колено ${Math.round(knee)}° · плечи ${w.toFixed(2)}`,
+          ? `✓ Присед · колено ${Math.round(knee)}°`
+          : knee > 135
+            ? `Присядьте чуть глубже · ${Math.round(knee)}°`
+            : `Держите присед · ${Math.round(knee)}°`,
+        metrics: `колено ${Math.round(knee)}°`,
+      };
+    }
+    case "upper_body": {
+      const nose = landmarks[LM.NOSE];
+      const lw = landmarks[LM.L_WRIST];
+      const rw = landmarks[LM.R_WRIST];
+      const headOk = (nose.visibility ?? 0) > 0.4;
+      const shouldersOk = w > 0.14 && w < 0.45;
+      const progress =
+        (headOk ? 0.4 : 0) +
+        (shouldersOk ? 0.4 : clamp01(w / 0.14) * 0.4) +
+        (((lw.visibility ?? 0) + (rw.visibility ?? 0)) / 2) * 0.2;
+      const accepted = headOk && shouldersOk && progress >= 0.7;
+      return {
+        progress,
+        accepted,
+        feedback: accepted
+          ? "✓ Верх тела в кадре"
+          : !headOk
+            ? "Подойдите ближе — нужна голова и плечи"
+            : "Плечи шире в кадре — чуть ближе к монитору",
+        metrics: `плечи ${w.toFixed(2)} · голова ${(nose.visibility ?? 0).toFixed(2)}`,
+      };
+    }
+    case "arms_up": {
+      const ls = landmarks[LM.L_SHOULDER];
+      const rs = landmarks[LM.R_SHOULDER];
+      const lw = landmarks[LM.L_WRIST];
+      const rw = landmarks[LM.R_WRIST];
+      const shoulderY = (ls.y + rs.y) / 2;
+      const wristY = (lw.y + rw.y) / 2;
+      const raised = wristY < shoulderY - 0.03;
+      const visOk =
+        (lw.visibility ?? 0) > 0.35 && (rw.visibility ?? 0) > 0.35;
+      const progress = (raised ? 0.6 : 0.2) + (visOk ? 0.4 : 0.1);
+      const accepted = raised && visOk;
+      return {
+        progress,
+        accepted,
+        feedback: accepted
+          ? "✓ Руки вверх"
+          : "Поднимите обе руки выше плеч, кисти в кадре",
+        metrics: `wristY ${wristY.toFixed(2)} · shoulderY ${shoulderY.toFixed(2)}`,
+      };
+    }
+    case "step_back": {
+      const hipVis =
+        ((landmarks[LM.L_HIP].visibility ?? 0) +
+          (landmarks[LM.R_HIP].visibility ?? 0)) /
+        2;
+      const kneeVis =
+        ((landmarks[LM.L_KNEE].visibility ?? 0) +
+          (landmarks[LM.R_KNEE].visibility ?? 0)) /
+        2;
+      const progress = hipVis * 0.45 + kneeVis * 0.55;
+      const accepted = hipVis > 0.4 && kneeVis > 0.35;
+      return {
+        progress,
+        accepted,
+        feedback: accepted
+          ? "✓ Бёдра и колени видны"
+          : "Отойдите на шаг — нужны бёдра и колени",
+        metrics: `бёдра ${hipVis.toFixed(2)} · колени ${kneeVis.toFixed(2)}`,
       };
     }
     default:
@@ -195,7 +256,12 @@ export function poseGuideHint(step: CalibrationStep): string {
     turn_right: "Поверните корпус вправо — покажите правый бок",
     center: "Встаньте лицом к камере",
     profile_turn: "Повернитесь боком — профиль, полный рост",
-    squat: "Боком к камере — присядьте, колено ~90°",
+    squat: "Присядьте — колени в кадре",
+    upper_body: "Ближе к монитору — голова и плечи",
+    arms_up: "Руки вверх, кисти в кадре",
+    rotate_360: "Медленный поворот на 360°",
+    step_back: "Шаг назад — бёдра и колени",
+    squat_lower: "Медленный присед",
   };
   return hints[step] ?? "Следуйте подсказке камеры";
 }
@@ -209,5 +275,9 @@ export function isPoseGuideStep(step: CalibrationStep): boolean {
     "center",
     "profile_turn",
     "squat",
+    "upper_body",
+    "arms_up",
+    "step_back",
+    "squat_lower",
   ].includes(step);
 }

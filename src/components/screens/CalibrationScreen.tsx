@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import Button from "@/components/ui/Button";
 import BiomechTwinPanel from "@/components/visual/BiomechTwinPanel";
 import LiveScanGrid from "@/components/visual/LiveScanGrid";
-import MuscleFatOverlay from "@/components/camera/MuscleFatOverlay";
 import AutoFrameViewport from "@/components/camera/AutoFrameViewport";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import CalibrationProgress from "@/components/calibration/CalibrationProgress";
@@ -19,14 +18,18 @@ import {
   waitForLivePose,
   requestPoseSkip,
 } from "@/lib/calibration/poseGuide";
-import { analyzeScanFrame, type ScanAnalysis } from "@/lib/calibration/scanAnalysis";
+import {
+  buildBodyScanJson,
+  pushBodyScanSample,
+  type BodyScanSample,
+} from "@/lib/calibration/bodyScanPayload";
 import { speakScript, speakGuidance, stopSpeaking } from "@/lib/ai/speech";
-import type { CalibrationStep, NormalizedLandmark } from "@/types";
+import type { CalibrationStep, LatchedBodyData, NormalizedLandmark } from "@/types";
 
 export default function CalibrationScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const landmarksRef = useRef<NormalizedLandmark[] | null>(null);
-  const scanRef = useRef<ScanAnalysis | null>(null);
+  const samplesRef = useRef<BodyScanSample[]>([]);
   const [scriptText, setScriptText] = useState("");
   const [running, setRunning] = useState(false);
   const [showComposition, setShowComposition] = useState(false);
@@ -37,10 +40,11 @@ export default function CalibrationScreen() {
   const [scanStatus, setScanStatus] = useState("");
   const [liveMetrics, setLiveMetrics] = useState("");
   const [guideProgress, setGuideProgress] = useState(0);
-  const [sweepPhase, setSweepPhase] = useState(0);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const setPhase = useAppStore((s) => s.setPhase);
   const setFocusSportPicker = useDashboardLayoutStore((s) => s.setFocusSportPicker);
+  const latchBodyResult = useAppStore((s) => s.latchBodyResult);
   const latchBodyData = useAppStore((s) => s.latchBodyData);
   const latchedBody = useAppStore((s) => s.latchedBody);
   const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
@@ -49,6 +53,7 @@ export default function CalibrationScreen() {
   const unlockForRescan = useAppStore((s) => s.unlockForRescan);
   const clearRescanPending = useAppStore((s) => s.clearRescanPending);
   const ensureProfile = useAppStore((s) => s.ensureProfile);
+  const profile = useAppStore((s) => s.profile);
 
   const { cameraStatus, cameraError } = useCamera(videoRef, true);
   const { tick, poseReady, poseError } = usePoseTracker(videoRef, true);
@@ -61,24 +66,11 @@ export default function CalibrationScreen() {
       clearRescanPending();
     }
     return () => stopSpeaking();
-    // Mount-only: store actions are stable; avoid re-running reset on each render
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const tickRef = useRef(tick);
   tickRef.current = tick;
-
-  useEffect(() => {
-    if (!running) return;
-    const start = performance.now();
-    let raf: number;
-    const loop = () => {
-      setSweepPhase(((performance.now() - start) % 3000) / 3000);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [running]);
 
   useEffect(() => {
     let raf: number;
@@ -88,10 +80,7 @@ export default function CalibrationScreen() {
       if (lm) {
         landmarksRef.current = lm;
         frame += 1;
-        // ~15fps UI updates — enough for overlays, avoids render storm
-        if (frame % 4 === 0) {
-          setLandmarks(lm);
-        }
+        if (frame % 4 === 0) setLandmarks(lm);
       }
       raf = requestAnimationFrame(loop);
     };
@@ -99,22 +88,13 @@ export default function CalibrationScreen() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const speakAsync = (text: string, emphasis = false) =>
+  const speakAsync = (text: string) =>
     new Promise<void>((resolve) =>
       speakScript(`cal:line:${text.slice(0, 40)}`, text, {
-        emphasis,
+        emphasis: false,
         onEnd: resolve,
       })
     );
-
-  const distanceVoiceSteps: CalibrationStep[] = [
-    "idle",
-    "scan_start",
-    "body_analysis",
-    "clothing_check",
-  ];
-  const autoFrameVoice =
-    distanceVoiceSteps.includes(calibrationStep) && !showComposition;
 
   const waitCameraPose = async (step: CalibrationStep) => {
     setPoseOk(false);
@@ -127,13 +107,50 @@ export default function CalibrationScreen() {
         setScanStatus(feedback);
         setLiveMetrics(metrics);
         setPoseOk(progress >= 0.88);
+        if (running) {
+          pushBodyScanSample(samplesRef.current, landmarksRef.current, step);
+        }
       },
       (feedback) => {
-        if (distanceVoiceSteps.includes(step)) return;
         speakGuidance(`cal:pose:${step}`, feedback, { cooldownMs: 12000 });
       }
     );
     setPoseOk(true);
+  };
+
+  const sampleForDuration = async (step: CalibrationStep, ms: number) => {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      pushBodyScanSample(samplesRef.current, landmarksRef.current, step);
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  };
+
+  const runGeminiAnalysis = async (): Promise<LatchedBodyData | null> => {
+    const p = profile ?? ensureProfile();
+    const scan = buildBodyScanJson(p, samplesRef.current);
+    setScanStatus("Gemini анализирует осанку и состав тела…");
+
+    try {
+      const res = await fetch("/api/gemini/body-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scan, weight: p.weight }),
+      });
+      const data = await res.json();
+      if (res.ok && data.latched) {
+        if (data.source !== "gemini") {
+          setScanStatus("Локальный анализ состава (Gemini недоступен)");
+        }
+        return data.latched as LatchedBodyData;
+      }
+      setScanStatus("Локальный анализ состава");
+    } catch {
+      setScanStatus("Сеть недоступна — локальный расчёт");
+    }
+
+    // Fallback without locking — caller will latch
+    return latchBodyData(null);
   };
 
   const runScript = useCallback(async () => {
@@ -141,62 +158,57 @@ export default function CalibrationScreen() {
     ensureProfile();
     setRunning(true);
     setShowComposition(false);
-    setScanStatus("Камера анализирует…");
-    scanRef.current = null;
+    setAnalyzing(false);
+    setScanStatus("Камера готова");
+    samplesRef.current = [];
 
     for (const line of CALIBRATION_SCRIPT) {
       setStepLocal(line.step);
       setCalibrationStep(line.step);
-      setGuideHint(isPoseGuideStep(line.step) ? poseGuideHint(line.step) : "");
+      setGuideHint(line.poseGuide ? poseGuideHint(line.step) : "");
       setPoseOk(false);
       setScriptText(line.text);
 
       await speakAsync(line.text);
 
-      if (isPoseGuideStep(line.step)) {
-        await waitCameraPose(line.step);
-        if (line.step === "body_analysis") {
-          scanRef.current = analyzeScanFrame(landmarksRef.current);
-          setScanStatus(
-            `✓ Скан: видимость ${Math.round((scanRef.current.bodyVisibleScore ?? 0) * 100)}%`
-          );
+      if (line.step === "analyzing") {
+        setAnalyzing(true);
+        setScanStatus("Сборка JSON и отправка в Gemini…");
+        const latched = await runGeminiAnalysis();
+        if (latched && !useAppStore.getState().bodyDataLocked) {
+          latchBodyResult(latched);
         }
-        continue;
-      }
-
-      if (line.step === "clothing_check") {
-        await waitCameraPose("body_analysis");
-        const analysis = analyzeScanFrame(landmarksRef.current);
-        scanRef.current = analysis;
-        if (analysis.clothingLikely) {
-          setScanStatus(`⚠ ${analysis.clothingReason}`);
-          await speakAsync(analysis.clothingReason);
-        } else {
-          setScanStatus("✓ Одежда не мешает");
-        }
-        continue;
-      }
-
-      if (line.step === "biomech_ready") {
-        await waitCameraPose("center");
-        const latched = latchBodyData(scanRef.current);
-        if (latched) {
+        const body = useAppStore.getState().latchedBody;
+        if (body) {
           setScanStatus(
-            `🔒 Data Latch · жир ${latched.fatPercent}% · мышцы ${latched.musclePercent}%`
+            `✓ Жир ${body.fatPercent}% · мышцы ${body.musclePercent}% · ${
+              body.source === "gemini" ? "Gemini" : "локально"
+            }`
           );
           await speakAsync(
-            `Данные зафиксированы. Жир ${latched.fatPercent}%, мышцы ${latched.musclePercent}%.`
+            `Анализ готов. Жир ${body.fatPercent} процента, мышцы ${body.musclePercent}.`
           );
-        } else {
-          setScanStatus("Ошибка — заполните профиль");
-          await speakAsync("Не удалось зафиксировать. Заполните профиль.");
         }
+        setAnalyzing(false);
         continue;
       }
 
       if (line.step === "visualization") {
         setShowComposition(true);
-        await speakAsync(line.text);
+        continue;
+      }
+
+      if (line.poseGuide && isPoseGuideStep(line.step)) {
+        await waitCameraPose(line.step);
+        await sampleForDuration(line.step, Math.min(line.durationMs, 1500));
+        continue;
+      }
+
+      // Timed steps (e.g. rotate_360) — sample continuously
+      if (line.sample) {
+        await sampleForDuration(line.step, line.durationMs);
+      } else {
+        await new Promise((r) => setTimeout(r, line.durationMs));
       }
     }
 
@@ -205,18 +217,29 @@ export default function CalibrationScreen() {
     setShowComposition(true);
     setGuideHint("");
     setRunning(false);
-  }, [running, latchBodyData, setCalibrationStep, ensureProfile]);
+  }, [
+    running,
+    latchBodyData,
+    latchBodyResult,
+    setCalibrationStep,
+    ensureProfile,
+    profile,
+  ]);
 
   const scanning = running && !showComposition;
 
   return (
-    <div className="relative min-h-dvh bg-slate-100">
+    <div className="relative min-h-dvh bg-slate-950">
       {!showComposition && (
         <AutoFrameViewport
           videoRef={videoRef}
           landmarks={landmarks}
           active={cameraStatus === "ready" && poseReady}
-          voiceNudges={autoFrameVoice}
+          voiceNudges={
+            calibrationStep === "upper_body" ||
+            calibrationStep === "arms_up" ||
+            calibrationStep === "step_back"
+          }
         >
           <LiveScanGrid active={scanning} />
           {scanning && (
@@ -224,11 +247,6 @@ export default function CalibrationScreen() {
               <div className="scan-sweep" />
             </div>
           )}
-          <MuscleFatOverlay
-            landmarks={landmarks}
-            active={scanning}
-            sweepPhase={sweepPhase}
-          />
         </AutoFrameViewport>
       )}
 
@@ -242,42 +260,65 @@ export default function CalibrationScreen() {
       {scanning && (
         <div className="absolute left-0 right-0 top-0 z-20 px-3 pt-3">
           <CalibrationProgress current={calibrationStep} />
-          <p className="mt-1 text-center font-mono text-[9px] text-cyan-800">
-            [CAM] {liveMetrics || "ожидание позы…"}
+          <p className="mt-1 text-center font-mono text-[9px] text-cyan-300">
+            [SCAN] {liveMetrics || (analyzing ? "Gemini…" : "ожидание…")}
           </p>
         </div>
       )}
 
       {showComposition && latchedBody && (
-        <div className="absolute left-0 top-0 bottom-0 z-20 flex w-[55%] flex-col justify-center bg-white px-6">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700">
-            Data Latch · Состав тела
+        <div className="absolute bottom-0 left-0 top-0 z-20 flex w-full flex-col justify-center overflow-y-auto bg-slate-950 px-5 py-8 lg:w-[52%]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-400">
+            Gemini · состав тела
           </p>
-          <h2 className="mt-1 text-2xl font-bold text-slate-900">
-            Цифровой двойник
-          </h2>
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <span className="h-4 w-4 rounded bg-amber-500" />
-              <div>
-                <p className="text-xs text-amber-800">Жировая зона · торс</p>
-                <p className="text-lg font-bold text-amber-600">
-                  {latchedBody.fatPercent}%
-                </p>
-              </div>
+          <h2 className="mt-1 text-2xl font-bold text-white">Цифровой двойник</h2>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <p className="text-[10px] uppercase text-amber-200/80">Жир</p>
+              <p className="text-2xl font-bold text-amber-400">
+                {latchedBody.fatPercent}%
+              </p>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <span className="h-4 w-4 rounded bg-emerald-500" />
-              <div>
-                <p className="text-xs text-emerald-800">Мышцы · конечности</p>
-                <p className="text-lg font-bold text-emerald-600">
-                  {latchedBody.musclePercent}%
-                </p>
-              </div>
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+              <p className="text-[10px] uppercase text-emerald-200/80">Мышцы</p>
+              <p className="text-2xl font-bold text-emerald-400">
+                {latchedBody.musclePercent}%
+              </p>
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-500">
-            Справа — 3D mesh: янтарный торс, зелёные мышцы, циановая сетка
+
+          {latchedBody.posture && (
+            <div className="mt-4 space-y-1.5 rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-xs text-slate-300">
+              <p>
+                <span className="text-cyan-400">Позвоночник:</span>{" "}
+                {latchedBody.posture.spine}
+              </p>
+              <p>
+                <span className="text-cyan-400">Плечи:</span>{" "}
+                {latchedBody.posture.shoulders}
+              </p>
+              <p>
+                <span className="text-cyan-400">Таз:</span>{" "}
+                {latchedBody.posture.hips}
+              </p>
+              <p>
+                <span className="text-cyan-400">Ось:</span>{" "}
+                {latchedBody.posture.alignment}
+              </p>
+            </div>
+          )}
+
+          {latchedBody.geminiReport && (
+            <p className="mt-4 text-sm leading-relaxed text-slate-200">
+              {latchedBody.geminiReport}
+            </p>
+          )}
+
+          <p className="mt-3 text-[10px] text-slate-500">
+            Жир на двойнике — тёплый оттенок в зонах анализа (живот, бёдра…). Без
+            «колбас» на руках.
+            {latchedBody.source === "gemini" ? " · Gemini" : " · локальный расчёт"}
           </p>
         </div>
       )}
@@ -287,29 +328,41 @@ export default function CalibrationScreen() {
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            className="absolute top-0 right-0 bottom-0 z-30 w-[45%] border-l border-cyan-200/40 bg-white shadow-2xl"
+            className="absolute bottom-0 right-0 top-0 z-30 hidden w-[48%] border-l border-cyan-500/20 bg-slate-950 shadow-2xl lg:block"
           >
             <BiomechTwinPanel latchedBody={latchedBody} locked tall showHud />
           </motion.div>
         )}
       </AnimatePresence>
 
+      {showComposition && latchedBody && (
+        <div className="absolute bottom-28 left-0 right-0 z-30 px-4 lg:hidden">
+          <BiomechTwinPanel
+            latchedBody={latchedBody}
+            locked
+            tall
+            showHud
+            className="h-56"
+          />
+        </div>
+      )}
+
       <div
-        className={`absolute bottom-0 z-40 bg-gradient-to-t from-white via-white/95 to-transparent px-4 pb-6 pt-12 ${
-          showComposition ? "left-0 right-[45%]" : "left-0 right-0"
+        className={`absolute bottom-0 z-40 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent px-4 pb-6 pt-12 ${
+          showComposition ? "left-0 right-0 lg:right-[48%]" : "left-0 right-0"
         }`}
       >
-        {guideHint && scanning && (
+        {guideHint && scanning && !analyzing && (
           <div className="mb-2">
-            <div className="mb-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
+            <div className="mb-1 h-1.5 overflow-hidden rounded-full bg-slate-800">
               <div
-                className="h-full rounded-full bg-cyan-500 transition-all duration-150"
+                className="h-full rounded-full bg-cyan-400 transition-all duration-150"
                 style={{ width: `${Math.round(guideProgress * 100)}%` }}
               />
             </div>
             <p
               className={`text-center text-sm font-semibold ${
-                poseOk ? "text-emerald-600" : "text-cyan-800"
+                poseOk ? "text-emerald-400" : "text-cyan-200"
               }`}
             >
               {scanStatus || guideHint}
@@ -319,9 +372,9 @@ export default function CalibrationScreen() {
                 type="button"
                 onClick={() => {
                   requestPoseSkip();
-                  setScanStatus("Шаг пропущен — продолжаем");
+                  setScanStatus("Шаг пропущен");
                 }}
-                className="mt-2 w-full text-center text-xs text-slate-500 underline"
+                className="mt-2 w-full text-center text-xs text-slate-400 underline"
               >
                 Пропустить шаг →
               </button>
@@ -329,10 +382,14 @@ export default function CalibrationScreen() {
           </div>
         )}
 
-        {scriptText && (
-          <div className="mb-3 rounded-xl border border-cyan-200/60 bg-white/95 px-3 py-2 backdrop-blur">
-            <p className="text-center text-xs leading-relaxed text-slate-700">
-              🎙 {scriptText}
+        {analyzing && (
+          <p className="mb-3 text-center text-sm text-cyan-300">{scanStatus}</p>
+        )}
+
+        {scriptText && scanning && (
+          <div className="mb-3 rounded-xl border border-cyan-500/30 bg-slate-900/90 px-3 py-2">
+            <p className="text-center text-xs leading-relaxed text-slate-200">
+              {scriptText}
             </p>
           </div>
         )}

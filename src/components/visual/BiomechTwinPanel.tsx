@@ -114,9 +114,10 @@ export default function BiomechTwinPanel({
             compositionMode={compositionKnown}
             fatPercent={fat}
             musclePercent={muscle}
+            fatZones={latchedBody?.fatZones}
             criticalMeshes={criticalMeshes}
             idleAnimate
-            theme="light"
+            theme="dark"
             fillHeight
             tall={tall}
             compact={compact}

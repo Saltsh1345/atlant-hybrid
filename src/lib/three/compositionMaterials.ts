@@ -3,16 +3,50 @@ import {
   classifyAvatarMesh,
   normalizeMeshName,
 } from "@/lib/three/muscleGroups";
+import type { FatZoneMap } from "@/types";
 
-const FAT = new THREE.Color("#f59e0b");
-const FAT_EMISSIVE = new THREE.Color("#f97316");
-const MUSCLE = new THREE.Color("#22c55e");
-const MUSCLE_EMISSIVE = new THREE.Color("#4ade80");
+const MUSCLE = new THREE.Color("#5eead4");
+const MUSCLE_EMISSIVE = new THREE.Color("#2dd4bf");
+const MUSCLE_IDLE = new THREE.Color("#7dd3fc");
+const MUSCLE_IDLE_EMISSIVE = new THREE.Color("#38bdf8");
+const FAT_TINT = new THREE.Color("#fbbf24");
+const FAT_EMISSIVE = new THREE.Color("#f59e0b");
 const CRITICAL = new THREE.Color("#ef4444");
 const CRITICAL_EMISSIVE = new THREE.Color("#f87171");
-const NEUTRAL = new THREE.Color("#94a3b8");
-const NEUTRAL_EMISSIVE = new THREE.Color("#06b6d4");
-const WIRE_CYAN = new THREE.Color("#22d3ee");
+const SKIN = new THREE.Color("#cbd5e1");
+const SKIN_EMISSIVE = new THREE.Color("#94a3b8");
+
+/** Mesh name → fat zone key for Gemini-driven paint. */
+const MESH_FAT_ZONE: Record<string, keyof FatZoneMap> = {
+  abs_c: "abdomen",
+  abs_l: "abdomen",
+  abs_r: "abdomen",
+  chest_l: "chest",
+  chest_r: "chest",
+  back_c: "back",
+  back_l: "back",
+  back_r: "back",
+  glutes_c: "hips",
+  glutes_l: "hips",
+  glutes_r: "hips",
+  quadriceps_l: "thighs",
+  quadriceps_r: "thighs",
+  hamstrings_l: "thighs",
+  hamstrings_r: "thighs",
+  calves_l: "thighs",
+  calves_r: "thighs",
+  biceps_l: "arms",
+  biceps_r: "arms",
+  triceps_l: "arms",
+  triceps_r: "arms",
+  forearms_l: "arms",
+  forearms_r: "arms",
+};
+
+function disposeMaterial(mat: THREE.Material | THREE.Material[]): void {
+  if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+  else mat.dispose();
+}
 
 function setMeshMaterial(
   mesh: THREE.Mesh,
@@ -21,97 +55,135 @@ function setMeshMaterial(
     emissive: THREE.Color;
     emissiveIntensity: number;
     opacity?: number;
-    wireframe?: boolean;
   }
 ): void {
+  if (mesh.material) disposeMaterial(mesh.material);
   mesh.material = new THREE.MeshStandardMaterial({
-    color: opts.color,
-    emissive: opts.emissive,
+    color: opts.color.clone(),
+    emissive: opts.emissive.clone(),
     emissiveIntensity: opts.emissiveIntensity,
-    roughness: 0.42,
-    metalness: 0.08,
-    transparent: true,
-    opacity: opts.opacity ?? 0.92,
-    wireframe: opts.wireframe ?? false,
-    side: THREE.DoubleSide,
+    roughness: 0.45,
+    metalness: 0.1,
+    transparent: (opts.opacity ?? 1) < 0.99,
+    opacity: opts.opacity ?? 1,
+    side: THREE.FrontSide,
+    vertexColors: false,
   });
 }
 
-/** Idle / pre-scan: cyan anatomical wireframe. */
-export function applyScanWireframe(root: THREE.Object3D, light = false): void {
+function isHeadOrExtremity(name: string): boolean {
+  const n = normalizeMeshName(name);
+  return (
+    n.startsWith("head") ||
+    n.startsWith("neck") ||
+    n.startsWith("hands") ||
+    n.startsWith("feet")
+  );
+}
+
+function lerpColor(a: THREE.Color, b: THREE.Color, t: number): THREE.Color {
+  return a.clone().lerp(b, t);
+}
+
+/** Always hide crude fat_* capsule meshes — paint on muscle groups instead. */
+function hideFatCapsules(root: THREE.Object3D): void {
+  root.traverse((child) => {
+    if (!(child as THREE.Mesh).isMesh) return;
+    const mesh = child as THREE.Mesh;
+    if (classifyAvatarMesh(mesh.name) === "fat") {
+      mesh.visible = false;
+    }
+  });
+}
+
+/** Pre-scan: clean anatomical twin, no fat paint. */
+export function applyIdleAnatomicalMaterials(root: THREE.Object3D): void {
+  hideFatCapsules(root);
   root.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
     const mesh = child as THREE.Mesh;
     const kind = classifyAvatarMesh(mesh.name);
-    const isFat = kind === "fat";
-    setMeshMaterial(mesh, {
-      color: isFat
-        ? new THREE.Color(light ? "#94a3b8" : "#64748b")
-        : new THREE.Color(light ? "#06b6d4" : "#22c55e"),
-      emissive: WIRE_CYAN,
-      emissiveIntensity: light ? (isFat ? 0.08 : 0.35) : isFat ? 0.05 : 0.22,
-      opacity: isFat ? 0.25 : 0.88,
-      wireframe: true,
-    });
-    mesh.visible = true;
+    if (kind === "fat") return;
+
+    if (kind === "muscle") {
+      const extremity = isHeadOrExtremity(mesh.name);
+      setMeshMaterial(mesh, {
+        color: extremity ? SKIN : MUSCLE_IDLE,
+        emissive: extremity ? SKIN_EMISSIVE : MUSCLE_IDLE_EMISSIVE,
+        emissiveIntensity: extremity ? 0.12 : 0.32,
+      });
+      mesh.visible = true;
+      return;
+    }
+    mesh.visible = false;
   });
 }
 
+export function applyScanWireframe(root: THREE.Object3D): void {
+  applyIdleAnatomicalMaterials(root);
+}
+
 /**
- * After body scan verification: fat meshes amber, muscle meshes green.
- * Intensity scales with composition percentages.
+ * After Gemini analysis: paint fat as warm tint on zones Gemini indicated.
+ * Never shows fat_arm / fat_leg capsules.
  */
 export function applyCompositionVertexMaterials(
   root: THREE.Object3D,
   fatPercent = 22,
-  musclePercent = 42
+  musclePercent = 42,
+  fatZones?: FatZoneMap
 ): void {
-  const fatBoost = Math.min(1, Math.max(0.15, fatPercent / 40));
-  const muscleBoost = Math.min(1, Math.max(0.2, musclePercent / 55));
+  hideFatCapsules(root);
+  const muscleBoost = Math.min(1, Math.max(0.25, musclePercent / 55));
+  const zones = fatZones ?? {
+    abdomen: Math.min(1, fatPercent / 35),
+    chest: Math.min(0.4, fatPercent / 50),
+    back: Math.min(0.35, fatPercent / 55),
+    hips: Math.min(0.7, fatPercent / 40),
+    thighs: Math.min(0.45, fatPercent / 45),
+    arms: 0.08,
+  };
 
   root.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
     const mesh = child as THREE.Mesh;
     const kind = classifyAvatarMesh(mesh.name);
+    if (kind === "fat") return;
 
-    if (kind === "fat") {
-      setMeshMaterial(mesh, {
-        color: FAT,
-        emissive: FAT_EMISSIVE,
-        emissiveIntensity: 0.25 + fatBoost * 0.85,
-        opacity: 0.35 + fatBoost * 0.45,
-        wireframe: false,
-      });
-      mesh.visible = fatPercent > 8;
+    if (kind !== "muscle") {
+      mesh.visible = false;
       return;
     }
 
-    if (kind === "muscle") {
+    const n = normalizeMeshName(mesh.name);
+    const extremity = isHeadOrExtremity(mesh.name);
+    const zoneKey = MESH_FAT_ZONE[n];
+    // Arms only if Gemini is confident (avoid fake arm fat)
+    let fatAmt = zoneKey ? zones[zoneKey] : 0;
+    if (zoneKey === "arms" && fatAmt < 0.45) fatAmt = 0;
+
+    if (extremity) {
       setMeshMaterial(mesh, {
-        color: MUSCLE,
-        emissive: MUSCLE_EMISSIVE,
-        emissiveIntensity: 0.2 + muscleBoost * 0.55,
-        opacity: 0.78 + muscleBoost * 0.18,
-        wireframe: false,
+        color: SKIN,
+        emissive: SKIN_EMISSIVE,
+        emissiveIntensity: 0.1,
       });
       mesh.visible = true;
       return;
     }
 
+    const base = MUSCLE.clone();
+    const color = lerpColor(base, FAT_TINT, fatAmt * 0.75);
+    const emissive = lerpColor(MUSCLE_EMISSIVE, FAT_EMISSIVE, fatAmt);
     setMeshMaterial(mesh, {
-      color: NEUTRAL,
-      emissive: NEUTRAL_EMISSIVE,
-      emissiveIntensity: 0.12,
-      opacity: 0.55,
-      wireframe: true,
+      color,
+      emissive,
+      emissiveIntensity: 0.22 + muscleBoost * 0.35 + fatAmt * 0.55,
     });
+    mesh.visible = true;
   });
 }
 
-/**
- * Post-workout critical technique: listed muscle meshes glow red.
- * Other muscles stay muted green; fat stays amber if composition known.
- */
 export function applyCriticalMuscleMaterials(
   root: THREE.Object3D,
   criticalMeshes: string[],
@@ -119,73 +191,30 @@ export function applyCriticalMuscleMaterials(
     fatPercent?: number;
     musclePercent?: number;
     compositionKnown?: boolean;
+    fatZones?: FatZoneMap;
   }
 ): void {
-  const critical = new Set(
-    criticalMeshes.map((n) => normalizeMeshName(n))
-  );
-  const compositionKnown = opts?.compositionKnown ?? false;
-  const fatPercent = opts?.fatPercent ?? 22;
-  const musclePercent = opts?.musclePercent ?? 42;
-
-  if (compositionKnown) {
-    applyCompositionVertexMaterials(root, fatPercent, musclePercent);
+  const critical = new Set(criticalMeshes.map((n) => normalizeMeshName(n)));
+  if (opts?.compositionKnown) {
+    applyCompositionVertexMaterials(
+      root,
+      opts.fatPercent ?? 22,
+      opts.musclePercent ?? 42,
+      opts.fatZones
+    );
   } else {
-    applyScanWireframe(root, true);
+    applyIdleAnatomicalMaterials(root);
   }
 
   root.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
     const mesh = child as THREE.Mesh;
-    const n = normalizeMeshName(mesh.name);
-    if (!critical.has(n)) return;
-
+    if (!critical.has(normalizeMeshName(mesh.name))) return;
     setMeshMaterial(mesh, {
       color: CRITICAL,
       emissive: CRITICAL_EMISSIVE,
-      emissiveIntensity: 0.95,
-      opacity: 0.96,
-      wireframe: false,
+      emissiveIntensity: 0.9,
     });
     mesh.visible = true;
-  });
-}
-
-/** Soft idle materials when no scan and no critical state. */
-export function applyIdleAnatomicalMaterials(root: THREE.Object3D): void {
-  root.traverse((child) => {
-    if (!(child as THREE.Mesh).isMesh) return;
-    const mesh = child as THREE.Mesh;
-    const kind = classifyAvatarMesh(mesh.name);
-
-    if (kind === "fat") {
-      setMeshMaterial(mesh, {
-        color: new THREE.Color("#cbd5e1"),
-        emissive: new THREE.Color("#94a3b8"),
-        emissiveIntensity: 0.08,
-        opacity: 0.2,
-        wireframe: false,
-      });
-      return;
-    }
-
-    if (kind === "muscle") {
-      setMeshMaterial(mesh, {
-        color: new THREE.Color("#67e8f9"),
-        emissive: WIRE_CYAN,
-        emissiveIntensity: 0.18,
-        opacity: 0.82,
-        wireframe: false,
-      });
-      return;
-    }
-
-    setMeshMaterial(mesh, {
-      color: NEUTRAL,
-      emissive: NEUTRAL_EMISSIVE,
-      emissiveIntensity: 0.1,
-      opacity: 0.5,
-      wireframe: true,
-    });
   });
 }

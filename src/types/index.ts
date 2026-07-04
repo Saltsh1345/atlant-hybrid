@@ -22,7 +22,31 @@ export type CalibrationStep =
   | "squat"
   | "biomech_ready"
   | "visualization"
-  | "complete";
+  | "complete"
+  /** Laptop-friendly scan: upper body close, then rotate, then step back + squat */
+  | "upper_body"
+  | "arms_up"
+  | "rotate_360"
+  | "step_back"
+  | "squat_lower"
+  | "analyzing";
+
+/** 0–1 intensity of fat draw on avatar zones (from Gemini body analysis). */
+export interface FatZoneMap {
+  abdomen: number;
+  chest: number;
+  back: number;
+  hips: number;
+  thighs: number;
+  arms: number;
+}
+
+export interface PostureReport {
+  spine: string;
+  shoulders: string;
+  hips: string;
+  alignment: string;
+}
 
 export type Sport = "strength" | "boxing" | "tennis";
 
@@ -53,6 +77,12 @@ export interface LatchedBodyData {
   lockedAt: string;
   clothingDetected?: boolean;
   scanNote?: string;
+  /** Where to paint fat on the twin (Gemini zones, not crude arm capsules). */
+  fatZones?: FatZoneMap;
+  posture?: PostureReport;
+  /** Short Gemini body report for the user. */
+  geminiReport?: string;
+  source?: "gemini" | "local";
 }
 
 export interface LiveKinematics {

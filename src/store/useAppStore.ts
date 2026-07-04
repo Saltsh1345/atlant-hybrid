@@ -69,6 +69,8 @@ interface AppStore {
 
   /** ONE-TIME latch — refuses if already locked */
   latchBodyData: (scan?: ScanAnalysis | null) => LatchedBodyData | null;
+  /** Latch pre-built body data (e.g. from Gemini body-scan). */
+  latchBodyResult: (data: LatchedBodyData) => LatchedBodyData | null;
 
   setSelectedSport: (sport: Sport) => void;
   setSelectedExercise: (exercise: StrengthExercise) => void;
@@ -141,6 +143,12 @@ export const useAppStore = create<AppStore>()(
         const latched = simulateBodyComposition(profile, scan);
         set({ latchedBody: latched, bodyDataLocked: true });
         return latched;
+      },
+
+      latchBodyResult: (data) => {
+        if (get().bodyDataLocked) return get().latchedBody;
+        set({ latchedBody: data, bodyDataLocked: true });
+        return data;
       },
 
       setSelectedSport: (sport) =>

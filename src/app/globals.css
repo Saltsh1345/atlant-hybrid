@@ -122,16 +122,16 @@ body {
 }
 
 .atlant-twin-panel {
-  border: 1px solid rgba(6, 182, 212, 0.2);
+  border: 1px solid rgba(34, 211, 238, 0.22);
   box-shadow:
-    0 8px 40px rgba(6, 182, 212, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    0 8px 40px rgba(2, 6, 23, 0.45),
+    inset 0 1px 0 rgba(34, 211, 238, 0.08);
 }
 
 .atlant-twin-bg {
   background:
-    radial-gradient(ellipse 80% 60% at 50% 100%, rgba(6, 182, 212, 0.12), transparent),
-    linear-gradient(180deg, #ffffff 0%, #f0f9ff 55%, #e0f2fe 100%);
+    radial-gradient(ellipse 80% 55% at 50% 100%, rgba(14, 165, 233, 0.14), transparent),
+    linear-gradient(180deg, #020617 0%, #0b1220 55%, #0f172a 100%);
 }
 
 .atlant-hud-pill {
@@ -139,8 +139,9 @@ body {
   align-items: center;
   gap: 0.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  background: rgba(15, 23, 42, 0.82);
+  color: #e2e8f0;
   backdrop-filter: blur(8px);
   padding: 0.3rem 0.65rem;
   font-size: 0.65rem;
@@ -155,9 +156,9 @@ body {
   font-family: ui-monospace, monospace;
   font-size: 0.6rem;
   letter-spacing: 0.06em;
-  color: #0891b2;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(6, 182, 212, 0.2);
+  color: #67e8f9;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(34, 211, 238, 0.28);
   border-radius: 0.35rem;
   padding: 0.2rem 0.45rem;
   z-index: 5;
