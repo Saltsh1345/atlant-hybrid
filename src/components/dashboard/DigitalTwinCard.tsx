@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Button from "@/components/ui/Button";
 import BiomechTwinPanel from "@/components/visual/BiomechTwinPanel";
 import { useAvatarAsset } from "@/hooks/useAvatarAsset";
-import type { LatchedBodyData } from "@/types";
+import type { LatchedBodyData, SessionSummary } from "@/types";
 
 interface DigitalTwinCardProps {
   bodyDataLocked: boolean;
@@ -12,6 +12,7 @@ interface DigitalTwinCardProps {
   onScan: () => void;
   onOpenLive?: () => void;
   className?: string;
+  lastSession?: SessionSummary | null;
 }
 
 export default function DigitalTwinCard({
@@ -20,6 +21,7 @@ export default function DigitalTwinCard({
   onScan,
   onOpenLive,
   className = "",
+  lastSession = null,
 }: DigitalTwinCardProps) {
   const { asset, available, ready } = useAvatarAsset();
   const [showTwin, setShowTwin] = useState(false);
@@ -49,7 +51,7 @@ export default function DigitalTwinCard({
               {!ready
                 ? "Загрузка mesh-модели…"
                 : !available
-                  ? "Добавьте avatar.fbx в public/"
+                  ? "Добавьте avatar.glb в public/"
                   : "Пройдите скан для фиксации состава"}
             </p>
           )}
@@ -76,6 +78,7 @@ export default function DigitalTwinCard({
           <BiomechTwinPanel
             latchedBody={latchedBody}
             locked={!!locked}
+            lastSession={lastSession}
             tall
             showHud
             className="h-full min-h-[220px]"

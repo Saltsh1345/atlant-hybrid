@@ -3,22 +3,28 @@
 import Button from "@/components/ui/Button";
 import PoseOverlay from "@/components/camera/PoseOverlay";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
-import TwinPlaceholder from "@/components/visual/TwinPlaceholder";
+import BiomechTwinPanel from "@/components/visual/BiomechTwinPanel";
 import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
 import { useAppStore } from "@/store/useAppStore";
-import { useRef, useEffect, useState } from "react";
+import { criticalMusclesFromSession } from "@/lib/three/muscleGroups";
+import { useRef, useEffect, useState, useMemo } from "react";
 import type { NormalizedLandmark } from "@/types";
 
-/** Полноэкранный живой цифровой двойник — камера + заглушка 3D */
 export default function TwinLiveScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[] | null>(null);
   const latchedBody = useAppStore((s) => s.latchedBody);
-  const kinematics = useAppStore((s) => s.kinematics);
+  const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
+  const lastSession = useAppStore((s) => s.lastSession);
   const setPhase = useAppStore((s) => s.setPhase);
 
   const { cameraStatus, cameraError } = useCamera(videoRef, true);
   const { tick, poseReady, poseError } = usePoseTracker(videoRef, true);
+
+  const criticalMeshes = useMemo(
+    () => criticalMusclesFromSession(lastSession),
+    [lastSession]
+  );
 
   useEffect(() => {
     let raf: number;
@@ -61,25 +67,33 @@ export default function TwinLiveScreen() {
           Цифровой двойник
         </h1>
         <p className="mb-4 text-xs text-slate-500">
-          Камера активна · 3D-модель в разработке
+          Анатомический mesh · сетка пола · подсветка состава и техники
         </p>
 
         {latchedBody && (
           <p className="mb-3 text-xs text-emerald-600">
             Жир {latchedBody.fatPercent}% · Мышцы {latchedBody.musclePercent}%
+            {criticalMeshes.length > 0
+              ? ` · критичных зон: ${criticalMeshes.length}`
+              : ""}
           </p>
         )}
 
         <div className="flex-1">
-          <TwinPlaceholder
-            mode="offline"
-            fatigue={kinematics.fatiguePercent}
+          <BiomechTwinPanel
+            latchedBody={latchedBody}
+            locked={bodyDataLocked}
+            lastSession={lastSession}
+            criticalMeshes={criticalMeshes}
+            tall
+            showHud
             className="h-full min-h-[320px]"
           />
         </div>
 
         <p className="mt-4 text-center text-[10px] text-slate-500">
-          MediaPipe отслеживает позу. IK-аватар временно отключён.
+          После скана — жир (янтарный) и мышцы (зелёный). После слабой техники —
+          красная пульсация критичных групп.
         </p>
 
         <Button
@@ -88,7 +102,7 @@ export default function TwinLiveScreen() {
           className="mt-4"
           onClick={() => setPhase("dashboard")}
         >
-          Закрыть
+          На дашборд
         </Button>
       </div>
     </div>

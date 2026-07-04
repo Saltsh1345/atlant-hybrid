@@ -1,7 +1,12 @@
 "use client";
 
-import TwinPlaceholder from "@/components/visual/TwinPlaceholder";
-import type { LatchedBodyData } from "@/types";
+import { useMemo } from "react";
+import AvatarViewer from "@/components/three/AvatarViewer";
+import { useAvatarAsset } from "@/hooks/useAvatarAsset";
+import {
+  criticalMusclesFromSession,
+} from "@/lib/three/muscleGroups";
+import type { LatchedBodyData, SessionSummary } from "@/types";
 
 interface BiomechTwinPanelProps {
   latchedBody?: LatchedBodyData | null;
@@ -10,50 +15,9 @@ interface BiomechTwinPanelProps {
   compact?: boolean;
   showHud?: boolean;
   className?: string;
-}
-
-function FloorGrid() {
-  return (
-    <svg
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] opacity-60"
-      viewBox="0 0 400 180"
-      preserveAspectRatio="none"
-    >
-      <defs>
-        <linearGradient id="floor-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#06b6d4" stopOpacity="0" />
-          <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.25" />
-        </linearGradient>
-      </defs>
-      {Array.from({ length: 12 }).map((_, i) => {
-        const y = 20 + i * 14;
-        const spread = 30 + i * 18;
-        return (
-          <line
-            key={`h-${i}`}
-            x1={200 - spread}
-            y1={y}
-            x2={200 + spread}
-            y2={y}
-            stroke="url(#floor-fade)"
-            strokeWidth={0.8}
-          />
-        );
-      })}
-      {[-3, -2, -1, 0, 1, 2, 3].map((i) => (
-        <line
-          key={`v-${i}`}
-          x1={200 + i * 55}
-          y1={10}
-          x2={200 + i * 12}
-          y2={170}
-          stroke="#06b6d4"
-          strokeOpacity={0.15}
-          strokeWidth={0.8}
-        />
-      ))}
-    </svg>
-  );
+  /** Last session — red critical muscles when technique was poor. */
+  lastSession?: SessionSummary | null;
+  criticalMeshes?: string[];
 }
 
 export default function BiomechTwinPanel({
@@ -63,10 +27,20 @@ export default function BiomechTwinPanel({
   compact,
   showHud = true,
   className = "",
+  lastSession = null,
+  criticalMeshes: criticalOverride,
 }: BiomechTwinPanelProps) {
+  const { asset, ready, error: assetError } = useAvatarAsset();
   const fat = latchedBody?.fatPercent ?? 22;
   const muscle = latchedBody?.musclePercent ?? 42;
-  const placeholderMode = locked && latchedBody ? "waiting" : "offline";
+  const compositionKnown = locked && !!latchedBody;
+
+  const criticalMeshes = useMemo(() => {
+    if (criticalOverride?.length) return criticalOverride;
+    return criticalMusclesFromSession(lastSession);
+  }, [criticalOverride, lastSession]);
+
+  const hasCritical = criticalMeshes.length > 0;
 
   return (
     <div
@@ -79,19 +53,32 @@ export default function BiomechTwinPanel({
       } ${className}`}
     >
       <div className="atlant-twin-bg absolute inset-0" />
-      <FloorGrid />
 
       {showHud && (
         <>
           <div className="atlant-hud-pill absolute left-3 top-3 z-10">
-            <span className="h-2 w-2 rounded-full bg-orange-400" />
+            <span
+              className={`h-2 w-2 rounded-full ${
+                hasCritical ? "bg-red-500" : "bg-orange-400"
+              }`}
+            />
             Биомеханика
           </div>
-          <div className="atlant-hud-pill absolute right-3 top-3 z-10 !border-emerald-200 !text-emerald-700">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            В сети
+          <div
+            className={`atlant-hud-pill absolute right-3 top-3 z-10 ${
+              hasCritical
+                ? "!border-red-200 !text-red-700"
+                : "!border-emerald-200 !text-emerald-700"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 animate-pulse rounded-full ${
+                hasCritical ? "bg-red-500" : "bg-emerald-500"
+              }`}
+            />
+            {hasCritical ? "Критично" : "В сети"}
           </div>
-          {locked && latchedBody && (
+          {compositionKnown && (
             <>
               <div className="atlant-hud-tag absolute bottom-3 left-3 z-10">
                 [ЖИР: {fat}%]
@@ -100,24 +87,43 @@ export default function BiomechTwinPanel({
                 [МЫШЦЫ: {muscle}%]
               </div>
               <div className="atlant-hud-tag absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
-                [BIOMETRICS: STABLE]
+                {hasCritical
+                  ? "[ТЕХНИКА: КРИТИЧНО]"
+                  : "[BIOMETRICS: STABLE]"}
               </div>
             </>
+          )}
+          {!compositionKnown && (
+            <div className="atlant-hud-tag absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
+              [ОЖИДАНИЕ СКАНА]
+            </div>
           )}
         </>
       )}
 
-      <div className="relative z-[2] flex h-full items-center justify-center p-4">
-        <TwinPlaceholder
-          mode={placeholderMode}
-          compact={compact}
-          className="h-full w-full border-0 bg-white/40 shadow-none"
-        />
+      <div className="relative z-[2] h-full min-h-[12rem] p-1">
+        {assetError ? (
+          <div className="flex h-full items-center justify-center rounded-xl bg-amber-50 text-center text-xs text-amber-800">
+            {assetError}
+          </div>
+        ) : (
+          <AvatarViewer
+            asset={asset ?? { url: "/avatar.glb", format: "glb" }}
+            assetReady={ready}
+            showWireframe={!compositionKnown && !hasCritical}
+            compositionMode={compositionKnown}
+            fatPercent={fat}
+            musclePercent={muscle}
+            criticalMeshes={criticalMeshes}
+            idleAnimate
+            theme="light"
+            fillHeight
+            tall={tall}
+            compact={compact}
+            interactive
+          />
+        )}
       </div>
-
-      {/* 3D twin temporarily disabled — awaiting high-poly static mesh
-      <AvatarViewer asset={asset} ... />
-      */}
     </div>
   );
 }

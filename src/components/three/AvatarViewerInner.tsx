@@ -17,8 +17,12 @@ import {
 } from "@/lib/three/fitModel";
 import {
   applyCompositionVertexMaterials,
+  applyCriticalMuscleMaterials,
+  applyIdleAnatomicalMaterials,
   applyScanWireframe,
 } from "@/lib/three/compositionMaterials";
+import { normalizeMeshName } from "@/lib/three/muscleGroups";
+import AvatarFloorGrid from "@/components/three/AvatarFloorGrid";
 
 export type AvatarModelKind =
   | "loading"
@@ -38,89 +42,6 @@ const DEFAULT_RIG: RigPose = {
   torsoLean: 0,
 };
 
-function tensionToColor(base: string, tension: number): string {
-  if (tension < 0.3) return base;
-  if (tension < 0.6) return "#f97316";
-  return "#ef4444";
-}
-
-function applyScanMaterials(root: THREE.Object3D, tension: number, cyan = false): void {
-  let idx = 0;
-  root.traverse((child) => {
-    if (!(child as THREE.Mesh).isMesh) return;
-    const mesh = child as THREE.Mesh;
-    const isTorso = idx === 0 || mesh.name.toLowerCase().includes("body");
-    const base = cyan
-      ? isTorso
-        ? "#f97316"
-        : "#06b6d4"
-      : isTorso
-        ? "#fbbf24"
-        : "#22c55e";
-    mesh.material = new THREE.MeshStandardMaterial({
-      color: tensionToColor(base, tension),
-      wireframe: true,
-      transparent: true,
-      opacity: cyan ? 0.95 : 0.9,
-      emissive: new THREE.Color(cyan ? "#22d3ee" : "#000000"),
-      emissiveIntensity: cyan ? 0.35 : 0,
-      side: THREE.DoubleSide,
-    });
-    idx++;
-  });
-}
-
-function meshZone(mesh: THREE.Mesh, meshCount: number): "torso" | "limb" {
-  const name = mesh.name.toLowerCase();
-  if (/arm|leg|hand|foot|thigh|calf|shoulder|forearm|shin|bicep|quad/i.test(name)) {
-    return "limb";
-  }
-  if (/body|torso|chest|spine|belly|hips|pelvis|abdomen|stomach/i.test(name)) {
-    return "torso";
-  }
-  if (meshCount === 1) {
-    mesh.geometry?.computeBoundingBox();
-    const box = mesh.geometry?.boundingBox;
-    if (box) {
-      const h = box.max.y - box.min.y;
-      const midY = (box.min.y + box.max.y) / 2;
-      const rel = h > 0 ? (midY - box.min.y) / h : 0.5;
-      return rel > 0.35 && rel < 0.78 ? "torso" : "limb";
-    }
-    return "torso";
-  }
-  return "limb";
-}
-
-/** Visible fat/muscle tint — strong emissive zones like PDF reference. */
-function applyCompositionMaterials(
-  root: THREE.Object3D,
-  fatPercent = 20,
-  musclePercent = 40
-): void {
-  const meshes: THREE.Mesh[] = [];
-  root.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) meshes.push(child as THREE.Mesh);
-  });
-
-  for (const mesh of meshes) {
-    const zone = meshZone(mesh, meshes.length);
-    const isTorso = zone === "torso";
-    mesh.material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(isTorso ? "#f59e0b" : "#22c55e"),
-      emissive: new THREE.Color(isTorso ? "#f97316" : "#4ade80"),
-      emissiveIntensity: isTorso
-        ? 0.35 + fatPercent / 180
-        : 0.3 + musclePercent / 200,
-      roughness: 0.45,
-      metalness: 0.08,
-      transparent: true,
-      opacity: 0.92,
-      side: THREE.DoubleSide,
-    });
-  }
-}
-
 function applyStaticPose(group: THREE.Object3D, rig: RigPose, lerp = 0.2): void {
   const squat = (rig.leftUpperLeg + rig.rightUpperLeg) / 2;
   const lean = THREE.MathUtils.clamp(rig.torsoLean, -0.22, 0.22);
@@ -133,22 +54,24 @@ function applyStaticPose(group: THREE.Object3D, rig: RigPose, lerp = 0.2): void 
 function SceneAvatar({
   scene,
   rig,
-  tension,
   scanMode,
   compositionMode,
   fatPercent,
   musclePercent,
   lightTheme,
+  criticalMeshes,
+  idleAnimate,
   onModelKind,
 }: {
   scene: THREE.Object3D;
   rig: RigPose;
-  tension: number;
   scanMode: boolean;
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
   lightTheme?: boolean;
+  criticalMeshes?: string[];
+  idleAnimate?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
 }) {
   const hasMesh = useMemo(() => hasVisibleGeometry(scene), [scene]);
@@ -161,11 +84,11 @@ function SceneAvatar({
 
   const groupRef = useRef<THREE.Group>(null);
   const bonesRef = useRef<ReturnType<typeof findBones>>(new Map());
+  const criticalMats = useRef<THREE.MeshStandardMaterial[]>([]);
   const rigged = useMemo(
     () => (prepared ? hasRiggedSkeleton(prepared.object) : false),
     [prepared]
   );
-  const limbMats = useRef<THREE.MeshStandardMaterial[]>([]);
 
   useEffect(() => {
     if (!hasMesh) {
@@ -178,8 +101,16 @@ function SceneAvatar({
   useEffect(() => {
     if (!prepared) return;
     bonesRef.current = findBones(prepared.object);
-    limbMats.current = [];
-    if (compositionMode) {
+    criticalMats.current = [];
+
+    const critical = criticalMeshes ?? [];
+    if (critical.length > 0) {
+      applyCriticalMuscleMaterials(prepared.object, critical, {
+        fatPercent,
+        musclePercent,
+        compositionKnown: !!compositionMode,
+      });
+    } else if (compositionMode) {
       applyCompositionVertexMaterials(
         prepared.object,
         fatPercent ?? 20,
@@ -188,29 +119,61 @@ function SceneAvatar({
     } else if (scanMode) {
       applyScanWireframe(prepared.object, lightTheme);
     } else {
-      normalizeModelMaterials(prepared.object);
+      applyIdleAnatomicalMaterials(prepared.object);
     }
-  }, [prepared, scanMode, compositionMode, tension, fatPercent, musclePercent, lightTheme]);
 
-  useFrame(() => {
-    if (!prepared) return;
-    if (compositionMode) return;
+    if (critical.length > 0) {
+      const set = new Set(critical.map(normalizeMeshName));
+      prepared.object.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        if (!set.has(normalizeMeshName(mesh.name))) return;
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        if (mat?.isMeshStandardMaterial) criticalMats.current.push(mat);
+      });
+    }
+  }, [
+    prepared,
+    scanMode,
+    compositionMode,
+    fatPercent,
+    musclePercent,
+    lightTheme,
+    criticalMeshes,
+  ]);
+
+  useFrame(({ clock }) => {
+    if (!prepared || !groupRef.current) return;
+
+    if (idleAnimate && !rigged) {
+      const t = clock.getElapsedTime();
+      groupRef.current.rotation.y = Math.sin(t * 0.35) * 0.12;
+      groupRef.current.position.y =
+        prepared.position[1] + Math.sin(t * 1.1) * 0.012;
+    }
+
     if (rigged && bonesRef.current.size > 2) {
       applyRigToBones(bonesRef.current, rig);
-    } else if (groupRef.current) {
+    } else if (!idleAnimate) {
       applyStaticPose(groupRef.current, rig);
     }
-    for (const mat of limbMats.current) {
-      mat.color.set(tensionToColor("#22c55e", tension));
+
+    for (const mat of criticalMats.current) {
+      const pulse = 0.65 + Math.sin(clock.getElapsedTime() * 3.2) * 0.3;
+      mat.emissiveIntensity = pulse;
     }
   });
 
   if (!hasMesh || !prepared) {
-    return <PoseDrivenAvatar rig={rig} tension={tension} />;
+    return <PoseDrivenAvatar rig={rig} />;
   }
 
   return (
-    <group ref={groupRef} scale={prepared.scale} position={prepared.position}>
+    <group
+      ref={groupRef}
+      scale={prepared.scale}
+      position={prepared.position}
+    >
       <primitive object={prepared.object} />
     </group>
   );
@@ -224,9 +187,21 @@ function GlbModel({
   React.ComponentProps<typeof SceneAvatar>,
   "scene" | "onModelKind"
 >) {
-  const { scene } = useGLTF(url);
-  return <SceneAvatar scene={scene} onModelKind={onModelKind} {...props} />;
+  const gltf = useGLTF(url);
+  const clone = useMemo(() => {
+    const root = gltf.scene.clone(true);
+    root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh && mesh.geometry) {
+        mesh.geometry = mesh.geometry.clone();
+      }
+    });
+    return root;
+  }, [gltf.scene]);
+  return <SceneAvatar scene={clone} onModelKind={onModelKind} {...props} />;
 }
+
+useGLTF.preload("/avatar.glb");
 
 function FbxModel({
   url,
@@ -242,10 +217,8 @@ function FbxModel({
 
 export function PoseDrivenAvatar({
   rig,
-  tension,
 }: {
   rig: RigPose;
-  tension: number;
 }) {
   const torsoRef = useRef<THREE.Group>(null);
   const current = useRef<RigPose>({ ...DEFAULT_RIG });
@@ -259,26 +232,24 @@ export function PoseDrivenAvatar({
     if (torsoRef.current) torsoRef.current.rotation.z = c.torsoLean;
   });
 
-  const legColor = tensionToColor("#22c55e", tension);
-
   return (
-    <group position={[0, -0.5, 0]}>
-      <mesh position={[0, 1.2, 0]}>
-        <sphereGeometry args={[0.18, 16, 16]} />
+    <group position={[0, 0, 0]}>
+      <mesh position={[0, 1.55, 0]}>
+        <sphereGeometry args={[0.14, 16, 16]} />
         <meshStandardMaterial color="#22c55e" wireframe />
       </mesh>
-      <group ref={torsoRef} position={[0, 0.5, 0]}>
+      <group ref={torsoRef} position={[0, 0.95, 0]}>
         <mesh>
-          <boxGeometry args={[0.5, 0.7, 0.25]} />
+          <boxGeometry args={[0.45, 0.65, 0.22]} />
           <meshStandardMaterial color="#fbbf24" wireframe />
         </mesh>
-        <mesh position={[-0.15, -0.5, 0]}>
-          <capsuleGeometry args={[0.08, 0.7, 4, 8]} />
-          <meshStandardMaterial color={legColor} wireframe />
+        <mesh position={[-0.14, -0.55, 0]}>
+          <capsuleGeometry args={[0.07, 0.65, 4, 8]} />
+          <meshStandardMaterial color="#22c55e" wireframe />
         </mesh>
-        <mesh position={[0.15, -0.5, 0]}>
-          <capsuleGeometry args={[0.08, 0.7, 4, 8]} />
-          <meshStandardMaterial color={legColor} wireframe />
+        <mesh position={[0.14, -0.55, 0]}>
+          <capsuleGeometry args={[0.07, 0.65, 4, 8]} />
+          <meshStandardMaterial color="#22c55e" wireframe />
         </mesh>
       </group>
     </group>
@@ -287,7 +258,7 @@ export function PoseDrivenAvatar({
 
 function AvatarLoader() {
   return (
-    <mesh>
+    <mesh position={[0, 0.9, 0]}>
       <boxGeometry args={[0.25, 0.5, 0.15]} />
       <meshStandardMaterial color="#475569" wireframe />
     </mesh>
@@ -297,41 +268,44 @@ function AvatarLoader() {
 function AvatarScene({
   asset,
   rig,
-  tension,
   scanMode,
   compositionMode,
   fatPercent,
   musclePercent,
   lightTheme,
+  criticalMeshes,
+  idleAnimate,
   onModelKind,
 }: {
   asset: AvatarAsset | null;
   rig: RigPose;
-  tension: number;
   scanMode: boolean;
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
   lightTheme?: boolean;
+  criticalMeshes?: string[];
+  idleAnimate?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
 }) {
   useEffect(() => {
     if (!asset) onModelKind?.("procedural");
   }, [asset, onModelKind]);
 
-  if (!asset) return <PoseDrivenAvatar rig={rig} tension={tension} />;
+  if (!asset) return <PoseDrivenAvatar rig={rig} />;
 
   if (asset.format === "fbx") {
     return (
       <FbxModel
         url={asset.url}
         rig={rig}
-        tension={tension}
         scanMode={scanMode}
         compositionMode={compositionMode}
         fatPercent={fatPercent}
         musclePercent={musclePercent}
         lightTheme={lightTheme}
+        criticalMeshes={criticalMeshes}
+        idleAnimate={idleAnimate}
         onModelKind={onModelKind}
       />
     );
@@ -341,12 +315,13 @@ function AvatarScene({
     <GlbModel
       url={asset.url}
       rig={rig}
-      tension={tension}
       scanMode={scanMode}
       compositionMode={compositionMode}
       fatPercent={fatPercent}
       musclePercent={musclePercent}
       lightTheme={lightTheme}
+      criticalMeshes={criticalMeshes}
+      idleAnimate={idleAnimate}
       onModelKind={onModelKind}
     />
   );
@@ -363,6 +338,9 @@ export interface AvatarViewerInnerProps {
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
+  /** Mesh names to highlight red (poor technique). */
+  criticalMeshes?: string[];
+  idleAnimate?: boolean;
   landmarks?: NormalizedLandmark[] | null;
   theme?: "light" | "dark";
   fillHeight?: boolean;
@@ -373,13 +351,14 @@ export default function AvatarViewerInner({
   asset,
   assetReady = true,
   showWireframe,
-  tension = 0,
   compact,
   tall,
   interactive = true,
   compositionMode = false,
   fatPercent,
   musclePercent,
+  criticalMeshes,
+  idleAnimate = true,
   landmarks = null,
   theme = "dark",
   fillHeight = false,
@@ -402,12 +381,13 @@ export default function AvatarViewerInner({
     ? "bg-gradient-to-b from-slate-50 to-cyan-50/80"
     : "bg-gradient-to-b from-slate-700 to-slate-900";
   const canvasBg = lightTheme ? "#f0f9ff" : "#1e293b";
-  const camZ = compositionMode ? 4.2 : 2.8;
-  const camY = compositionMode ? 1.0 : 0.9;
+  const camZ = compositionMode || (criticalMeshes?.length ?? 0) > 0 ? 3.6 : 3.2;
+  const camY = 0.95;
 
   return (
     <div
       className={`relative w-full overflow-hidden rounded-2xl ${shellClass} ${heightClass}`}
+      style={fillHeight ? { minHeight: 220 } : undefined}
     >
       {!assetReady && (
         <div
@@ -419,28 +399,59 @@ export default function AvatarViewerInner({
         </div>
       )}
       <Canvas
-        gl={{ antialias: true, alpha: false }}
-        camera={{ position: [0, camY, camZ], fov: compositionMode ? 34 : 40, near: 0.01, far: 1000 }}
-        style={{ width: "100%", height: "100%", minHeight: compact ? 128 : tall ? 208 : 192 }}
-        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: true, powerPreference: "default" }}
+        camera={{
+          position: [0, camY, camZ],
+          fov: 36,
+          near: 0.01,
+          far: 1000,
+        }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+        }}
+        dpr={[1, 1.5]}
+        resize={{ scroll: false, debounce: 100 }}
       >
         <color attach="background" args={[canvasBg]} />
-        <ambientLight intensity={lightTheme ? 1.8 : 1.45} />
-        <directionalLight position={[3, 5, 4]} intensity={lightTheme ? 1.6 : 2.05} />
-        <directionalLight position={[-3, 2, -2]} intensity={lightTheme ? 0.7 : 0.9} />
+        <ambientLight intensity={lightTheme ? 1.6 : 1.3} />
+        <directionalLight
+          position={[3, 5, 4]}
+          intensity={lightTheme ? 1.5 : 1.9}
+        />
+        <directionalLight
+          position={[-3, 2, -2]}
+          intensity={lightTheme ? 0.65 : 0.85}
+        />
+        <pointLight
+          position={[0, 2.2, 1.2]}
+          intensity={criticalMeshes?.length ? 1.2 : 0.6}
+          color={criticalMeshes?.length ? "#ef4444" : "#22d3ee"}
+        />
         <hemisphereLight
-          args={lightTheme ? ["#ffffff", "#e0f2fe", 0.9] : ["#e2e8f0", "#334155", 0.7]}
+          args={
+            lightTheme
+              ? ["#ffffff", "#e0f2fe", 0.85]
+              : ["#e2e8f0", "#334155", 0.65]
+          }
+        />
+        <AvatarFloorGrid
+          lightTheme={lightTheme}
+          pulse={(criticalMeshes?.length ?? 0) > 0}
         />
         <Suspense fallback={<AvatarLoader />}>
           <AvatarScene
             asset={asset}
             rig={rig}
-            tension={tension}
             scanMode={showWireframe}
             compositionMode={compositionMode}
             fatPercent={fatPercent}
             musclePercent={musclePercent}
             lightTheme={lightTheme}
+            criticalMeshes={criticalMeshes}
+            idleAnimate={idleAnimate}
             onModelKind={onModelKind}
           />
         </Suspense>

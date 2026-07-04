@@ -11,9 +11,10 @@ import CountdownOverlay from "@/components/training/CountdownOverlay";
 import RestTimerOverlay from "@/components/training/RestTimerOverlay";
 import SportHUD from "@/components/hud/SportHUD";
 import LiveScanGrid from "@/components/visual/LiveScanGrid";
-import TwinPlaceholder from "@/components/visual/TwinPlaceholder";
+import BiomechTwinPanel from "@/components/visual/BiomechTwinPanel";
 import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
 import { useAppStore } from "@/store/useAppStore";
+import { criticalMusclesFromLive } from "@/lib/three/muscleGroups";
 import { computeKinematics, resetVbtState } from "@/lib/pose/vbt";
 import {
   resetRepCounter,
@@ -53,6 +54,8 @@ export default function TrainingScreen() {
   const fatigueSpokenRef = useRef(false);
 
   const profile = useAppStore((s) => s.profile);
+  const latchedBody = useAppStore((s) => s.latchedBody);
+  const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
   const selectedSport = useAppStore((s) => s.selectedSport)!;
   const selectedExercise = useAppStore((s) => s.selectedExercise);
   const sessionStartTime = useAppStore((s) => s.sessionStartTime);
@@ -241,6 +244,15 @@ export default function TrainingScreen() {
 
   const ready = cameraStatus === "ready" && poseReady && !poseError;
   const trackingActive = isDrillSport ? drill.isTracking : countdownDone;
+  const criticalMeshes = useMemo(
+    () =>
+      criticalMusclesFromLive(
+        selectedSport,
+        selectedExercise,
+        formScore > 0 ? formScore : 100
+      ),
+    [selectedSport, selectedExercise, formScore]
+  );
   const autoFrameVoice =
     ready &&
     (!isDrillSport ||
@@ -372,15 +384,24 @@ export default function TrainingScreen() {
           <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Цифровой двойник
           </h2>
-          <span className="rounded-full border border-cyan-400/30 bg-cyan-50 px-2 py-0.5 font-mono text-[9px] text-cyan-700">
-            HEATMAP
+          <span
+            className={`rounded-full border px-2 py-0.5 font-mono text-[9px] ${
+              criticalMeshes.length > 0
+                ? "border-red-300 bg-red-50 text-red-700"
+                : "border-cyan-400/30 bg-cyan-50 text-cyan-700"
+            }`}
+          >
+            {criticalMeshes.length > 0 ? "CRITICAL" : "MESH"}
           </span>
         </div>
 
         <div className="min-h-[220px] flex-1">
-          <TwinPlaceholder
-            mode="heatmap"
-            fatigue={kinematics.fatiguePercent}
+          <BiomechTwinPanel
+            latchedBody={latchedBody}
+            locked={bodyDataLocked}
+            criticalMeshes={criticalMeshes}
+            tall
+            showHud
             className="h-full min-h-[220px] lg:min-h-[calc(100dvh-8rem)]"
           />
         </div>

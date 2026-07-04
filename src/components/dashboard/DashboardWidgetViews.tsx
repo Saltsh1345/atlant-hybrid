@@ -294,6 +294,7 @@ export function renderDashboardWidget(
         <DigitalTwinCard
           bodyDataLocked={ctx.bodyDataLocked}
           latchedBody={ctx.latchedBody}
+          lastSession={ctx.lastSession}
           onScan={ctx.onScan}
           onOpenLive={ctx.onTwinLive}
           className="h-full !border-0 !bg-transparent !shadow-none"

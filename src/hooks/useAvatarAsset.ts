@@ -9,63 +9,64 @@ export interface AvatarAsset {
   format: AvatarFormat;
 }
 
-const CANDIDATES: AvatarAsset[] = [
-  { url: "/avatar.fbx", format: "fbx" },
-  { url: "/avatar.glb", format: "glb" },
-];
+/** Prefer anatomical multi-mesh GLB in public/avatar.glb */
+const PRIMARY: AvatarAsset = { url: "/avatar.glb", format: "glb" };
+const FALLBACK: AvatarAsset = { url: "/avatar.fbx", format: "fbx" };
 
-/** HEAD only — never download multi-MB models just to probe. */
-async function probeAsset(candidate: AvatarAsset): Promise<boolean> {
+async function assetExists(url: string): Promise<boolean> {
   try {
-    const head = await fetch(candidate.url, { method: "HEAD" });
-    return head.ok;
+    const head = await fetch(url, { method: "HEAD" });
+    if (head.ok) return true;
+    // Some hosts reject HEAD — try a tiny range GET
+    const get = await fetch(url, {
+      method: "GET",
+      headers: { Range: "bytes=0-0" },
+    });
+    return get.ok || get.status === 206;
   } catch {
     return false;
   }
 }
 
 async function pickAvatarAsset(): Promise<AvatarAsset | null> {
-  let best: AvatarAsset | null = null;
-  let bestScore = -1;
-
-  for (const candidate of CANDIDATES) {
-    const ok = await probeAsset(candidate);
-    if (!ok) continue;
-
-    let score = candidate.format === "fbx" ? 2 : 1;
-    try {
-      const res = await fetch(candidate.url, { method: "HEAD" });
-      const lm = res.headers.get("last-modified");
-      if (lm) score += new Date(lm).getTime() / 1e15;
-    } catch {
-      /* keep default score */
-    }
-
-    if (score >= bestScore) {
-      best = candidate;
-      bestScore = score;
-    }
-  }
-
-  return best;
+  if (await assetExists(PRIMARY.url)) return PRIMARY;
+  if (await assetExists(FALLBACK.url)) return FALLBACK;
+  // Still try primary — Next serves public/ even if probe fails in some browsers
+  return PRIMARY;
 }
 
 export function useAvatarAsset() {
-  const [asset, setAsset] = useState<AvatarAsset | null>(null);
+  const [asset, setAsset] = useState<AvatarAsset | null>(PRIMARY);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    pickAvatarAsset().then((picked) => {
-      if (!cancelled) {
+    setReady(false);
+    setError(null);
+
+    pickAvatarAsset()
+      .then((picked) => {
+        if (cancelled) return;
         setAsset(picked);
         setReady(true);
-      }
-    });
+        if (!picked) setError("Файл avatar.glb не найден в /public");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAsset(PRIMARY);
+        setReady(true);
+      });
+
     return () => {
       cancelled = true;
     };
   }, []);
 
-  return { asset, available: asset !== null, ready };
+  return {
+    asset,
+    available: asset !== null,
+    ready,
+    error,
+  };
 }
