@@ -261,10 +261,10 @@ export default function TrainingScreen() {
       drill.phase === "complete");
 
   return (
-    <div className="flex min-h-dvh flex-col bg-slate-50 lg:flex-row">
+    <div className="flex min-h-dvh flex-col bg-background lg:flex-row">
       {/* Левая часть: камера + HUD */}
       <div className="relative flex min-h-[55vh] flex-1 flex-col lg:min-h-dvh lg:max-w-[58%]">
-        <div className="relative flex-1 overflow-hidden rounded-b-2xl border-b border-cyan-500/20 bg-slate-100 shadow-inner lg:rounded-none lg:border-b-0 lg:border-r">
+        <div className="relative flex-1 overflow-hidden rounded-b-2xl border-b border-[var(--primary)]/20 bg-background-secondary shadow-inner lg:rounded-none lg:border-b-0 lg:border-r">
           <AutoFrameViewport
             videoRef={videoRef}
             landmarks={landmarks}
@@ -343,11 +343,11 @@ export default function TrainingScreen() {
           )}
 
           <div className="absolute top-3 left-3 z-20 flex gap-2">
-            <span className="rounded-full border border-cyan-500/30 bg-white/80 px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-cyan-800 shadow backdrop-blur-md">
+            <span className="rounded-full border border-[var(--primary)]/30 bg-surface/80 px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-primary shadow backdrop-blur-md">
               {isDrillSport ? "Drill" : "VBT"} · {sportLabel}
             </span>
             {isDrillSport && drill.phase === "active" && (
-              <span className="rounded-full border border-orange-400/40 bg-orange-50/90 px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-orange-600 shadow backdrop-blur-md">
+              <span className="rounded-full border border-[var(--readiness)]/40 bg-[var(--readiness-muted)] px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-readiness shadow backdrop-blur-md">
                 Запись
               </span>
             )}
@@ -358,7 +358,7 @@ export default function TrainingScreen() {
           <Button
             size="lg"
             variant="ghost"
-            className="!w-auto flex-1 !border !border-slate-200 !bg-white/90 !text-slate-700"
+            className="!w-auto flex-1 !border !border-border !bg-surface/90 !text-foreground-secondary"
             onClick={() => setResting(true)}
             disabled={!countdownDone || resting || isDrillSport}
           >
@@ -381,14 +381,14 @@ export default function TrainingScreen() {
       {/* Правая часть: 3D-заглушка (heatmap emission) */}
       <aside className="flex w-full flex-col gap-4 p-4 lg:w-[42%] lg:max-w-[480px] lg:p-6">
         <div className="hidden items-center justify-between lg:flex">
-          <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+          <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-muted">
             Цифровой двойник
           </h2>
           <span
             className={`rounded-full border px-2 py-0.5 font-mono text-[9px] ${
               criticalMeshes.length > 0
-                ? "border-red-300 bg-red-50 text-red-700"
-                : "border-cyan-400/30 bg-cyan-50 text-cyan-700"
+                ? "border-[var(--danger)]/40 bg-[var(--danger)]/10 text-danger"
+                : "border-[var(--primary)]/30 bg-[var(--primary-muted)] text-primary"
             }`}
           >
             {criticalMeshes.length > 0 ? "CRITICAL" : "MESH"}
@@ -410,7 +410,7 @@ export default function TrainingScreen() {
           <Button
             size="lg"
             variant="ghost"
-            className="!w-auto flex-1 !border !border-slate-200 !bg-white/90 !text-slate-700"
+            className="!w-auto flex-1 !border !border-border !bg-surface/90 !text-foreground-secondary"
             onClick={() => setResting(true)}
             disabled={!countdownDone || resting || isDrillSport}
           >

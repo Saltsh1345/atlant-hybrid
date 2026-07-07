@@ -64,12 +64,12 @@ export default function DashboardDesktopGrid({
 
   return (
     <div ref={containerRef} className="w-full">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-200/50 bg-white/70 px-4 py-3 backdrop-blur-md">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-surface/70 px-4 py-3 backdrop-blur-md">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
             Рабочий стол · 12 колонок
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             {editMode
               ? "Перетащите за ⠿ · тяните угол для размера"
               : "Режим просмотра — включите редактирование для настройки"}
@@ -117,13 +117,13 @@ export default function DashboardDesktopGrid({
       </div>
 
       {editMode && pickerOpen && hiddenWidgets.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-dashed border-cyan-300/60 bg-cyan-50/40 p-3">
+        <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-muted)] p-3">
           {hiddenWidgets.map((id) => (
             <button
               key={id}
               type="button"
               onClick={() => addWidget(id)}
-              className="rounded-xl border border-cyan-200 bg-white px-3 py-2 text-xs font-medium text-cyan-800 shadow-sm hover:bg-cyan-50"
+              className="rounded-xl border border-[var(--primary)]/30 bg-surface px-3 py-2 text-xs font-medium text-primary shadow-sm hover:bg-[var(--primary-muted)]"
             >
               {WIDGET_META[id].icon} {WIDGET_META[id].title}
             </button>
@@ -132,7 +132,7 @@ export default function DashboardDesktopGrid({
       )}
 
       {editMode && pickerOpen && hiddenWidgets.length === 0 && (
-        <p className="mb-4 text-center text-xs text-slate-500">
+        <p className="mb-4 text-center text-xs text-muted">
           Все доступные виджеты уже на панели
         </p>
       )}
@@ -165,7 +165,7 @@ export default function DashboardDesktopGrid({
                 onRemove={removeWidget}
               >
                 {widgets[id] ?? (
-                  <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                  <div className="flex h-full items-center justify-center text-xs text-muted">
                     Нет данных
                   </div>
                 )}

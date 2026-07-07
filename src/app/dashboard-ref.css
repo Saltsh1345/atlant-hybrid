@@ -1,13 +1,11 @@
-/* Reference-style desktop dashboard (light theme) */
+/* Dashboard shell — uses global design tokens */
 .dashboard-ref {
-  --dash-bg: #eef1f6;
-  --dash-card: #ffffff;
-  --dash-blue: #2b9fff;
-  --dash-blue-dark: #1a7fe8;
-  --dash-text: #1e293b;
-  --dash-muted: #64748b;
   min-height: 100dvh;
   background: var(--dash-bg);
+  color: var(--dash-text);
+  transition:
+    background-color var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out);
 }
 
 .dashboard-ref-grid {
@@ -108,8 +106,8 @@
 .dash-card {
   border-radius: 22px;
   background: var(--dash-card);
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-subtle);
 }
 
 .dash-card-activity {

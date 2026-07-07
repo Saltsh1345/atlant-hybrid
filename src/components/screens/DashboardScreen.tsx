@@ -25,6 +25,7 @@ export default function DashboardScreen() {
   const sessionHistory = useAppStore((s) => s.sessionHistory);
   const setPhase = useAppStore((s) => s.setPhase);
   const requestRescan = useAppStore((s) => s.requestRescan);
+  const healthReadiness = useAppStore((s) => s.healthReadiness);
 
   const focusSportPicker = useDashboardLayoutStore((s) => s.focusSportPicker);
   const setFocusSportPicker = useDashboardLayoutStore((s) => s.setFocusSportPicker);
@@ -36,16 +37,24 @@ export default function DashboardScreen() {
     () => computeMuscleReadiness(latchedBody, lastSession, sessionHistory),
     [latchedBody, lastSession, sessionHistory]
   );
+  const effectiveReadiness = useMemo(() => {
+    if (!healthReadiness) return readiness;
+    return {
+      ...readiness,
+      overall: healthReadiness.score,
+      label: "По данным Health Kit",
+    };
+  }, [readiness, healthReadiness]);
 
   const plan = useMemo(() => {
     if (!profile) return null;
     return generateWorkoutPlan({
       goal: profile.goal ?? "maintain",
-      readiness,
+      readiness: effectiveReadiness,
       lastSport: lastSession?.sport,
       lastExercise: lastSession?.exercise,
     });
-  }, [profile, readiness, lastSession]);
+  }, [profile, effectiveReadiness, lastSession]);
 
   useEffect(() => {
     fetch("/api/gemini/status")
@@ -67,7 +76,7 @@ export default function DashboardScreen() {
 
   const startTraining = useCallback(
     (sport: Sport, exercise?: StrengthExercise) => {
-      goToTraining(sport, exercise);
+      void goToTraining(sport, exercise);
     },
     []
   );
@@ -99,7 +108,7 @@ export default function DashboardScreen() {
       profile,
       bodyDataLocked,
       latchedBody,
-      readiness,
+      readiness: effectiveReadiness,
       plan,
       geminiOk,
       lastSession,
@@ -115,7 +124,7 @@ export default function DashboardScreen() {
       profile,
       bodyDataLocked,
       latchedBody,
-      readiness,
+      effectiveReadiness,
       plan,
       geminiOk,
       lastSession,
@@ -143,15 +152,16 @@ export default function DashboardScreen() {
 
   return (
     <motion.div
-      className="min-h-dvh w-full bg-[#f4f7fb] pb-20 lg:pb-6"
+      className="min-h-dvh w-full bg-background pb-20 lg:pb-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
     >
       <div className="lg:hidden px-4 py-6">
         <PwaInstallBanner />
         <header className="mb-4">
-          <h1 className="text-2xl font-bold text-slate-900">Дашборд</h1>
-          <p className="text-xs text-slate-500">Выбор тренировки и виджеты</p>
+          <h1 className="text-2xl font-bold text-foreground">Дашборд</h1>
+          <p className="text-xs text-muted">Выбор тренировки и виджеты</p>
         </header>
         <DashboardMobileModular
           ctx={widgetCtx}

@@ -112,13 +112,13 @@ export function DashboardMobileModular({
     <>
       <MobileEditBar />
       {editMode && hidden.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-dashed border-cyan-200 bg-cyan-50/50 p-3">
+        <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-muted)] p-3">
           {hidden.map((id) => (
             <button
               key={id}
               type="button"
               onClick={() => addWidget(id)}
-              className="rounded-lg border border-cyan-200 bg-white px-2 py-1.5 text-xs text-cyan-800"
+              className="rounded-lg border border-[var(--primary)]/30 bg-surface px-2 py-1.5 text-xs text-primary"
             >
               + {WIDGET_META[id].icon} {WIDGET_META[id].title}
             </button>

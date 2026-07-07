@@ -16,7 +16,7 @@ export default function SportSelectScreen() {
   }, [setPhase, setFocusSportPicker]);
 
   return (
-    <div className="flex min-h-dvh items-center justify-center text-sm text-slate-500">
+    <div className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted">
       Переход на дашборд…
     </div>
   );

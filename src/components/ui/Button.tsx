@@ -1,8 +1,8 @@
 import { ButtonHTMLAttributes } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "ghost";
-  size?: "md" | "lg";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+  size?: "sm" | "md" | "lg";
 }
 
 export default function Button({
@@ -12,21 +12,20 @@ export default function Button({
   children,
   ...props
 }: ButtonProps) {
-  const base =
-    "inline-flex items-center justify-center font-medium transition-all rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed";
   const variants = {
-    primary: "bg-primary text-white shadow-lg shadow-sky-200 hover:bg-sky-600",
-    secondary:
-      "bg-white text-foreground border border-slate-200 hover:bg-slate-50",
-    ghost: "bg-transparent text-primary hover:bg-sky-50",
+    primary: "atlant-btn-primary",
+    secondary: "atlant-btn-secondary",
+    ghost: "atlant-btn-ghost",
+    danger: "atlant-btn-ghost !text-[var(--danger)] hover:!bg-red-500/10",
   };
   const sizes = {
+    sm: "px-3 py-2 text-xs",
     md: "px-5 py-3 text-sm",
     lg: "px-8 py-4 text-base w-full",
   };
   return (
     <button
-      className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`atlant-btn ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
       {children}

@@ -59,7 +59,7 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="fixed right-0 bottom-0 left-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md lg:hidden">
+    <nav className="fixed right-0 bottom-0 left-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md lg:hidden">
       <div className="mx-auto flex max-w-lg">
         {NAV.map((item) => {
           const active = isActive(item);
@@ -70,8 +70,8 @@ export default function BottomNav() {
               onClick={() => go(item)}
               className={`flex flex-1 flex-col items-center gap-0.5 py-3 text-[10px] transition ${
                 active
-                  ? "text-primary"
-                  : "text-slate-500 hover:text-slate-800"
+                  ? "text-[var(--primary)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
               <span className="text-lg">{item.icon}</span>

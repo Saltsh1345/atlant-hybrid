@@ -12,10 +12,12 @@ export default function SportPickerWidget({
 }) {
   return (
     <div
-      className={`relative z-10 h-full overflow-auto rounded-xl p-1 ${highlight ? "ring-2 ring-sky-400 ring-offset-2" : ""}`}
+      className={`relative z-10 h-full overflow-auto rounded-xl p-1 ${highlight ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
       id="dashboard-sport-picker"
     >
-      <p className="mb-2 text-xs font-semibold text-slate-700">Выберите тренировку</p>
+      <p className="mb-2 text-xs font-semibold text-foreground-secondary">
+        Выберите тренировку
+      </p>
       <SportPicker compact onSelect={onSelect} />
     </div>
   );

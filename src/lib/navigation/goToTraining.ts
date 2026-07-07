@@ -6,17 +6,21 @@ import type { Sport, StrengthExercise } from "@/types";
 export function goToTraining(
   sport: Sport,
   exercise?: StrengthExercise
-): void {
+): Promise<void> {
   const store = useAppStore.getState();
   store.ensureProfile();
   store.setSelectedSport(sport);
   if (exercise) store.setSelectedExercise(exercise);
-  store.startSession();
-
-  if (!store.setPhase("training")) {
-    useAppStore.setState({
-      phase: "training",
-      trackingMode: trackingModeForPhase("training"),
+  return store
+    .refreshHealthReadiness()
+    .catch(() => null)
+    .then(() => {
+      store.startSession();
+      if (!store.setPhase("training")) {
+        useAppStore.setState({
+          phase: "training",
+          trackingMode: trackingModeForPhase("training"),
+        });
+      }
     });
-  }
 }

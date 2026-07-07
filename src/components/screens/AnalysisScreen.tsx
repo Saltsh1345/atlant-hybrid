@@ -57,7 +57,7 @@ function AnalysisBody({ text }: { text: string }) {
     return (
       <div className="space-y-4">
         {paragraphs.map((paragraph, i) => (
-          <p key={i} className="leading-relaxed text-slate-700">
+          <p key={i} className="leading-relaxed text-foreground-secondary">
             {paragraph}
           </p>
         ))}
@@ -66,7 +66,7 @@ function AnalysisBody({ text }: { text: string }) {
   }
 
   return (
-    <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
+    <p className="whitespace-pre-wrap leading-relaxed text-foreground-secondary">
       {text}
     </p>
   );
@@ -81,6 +81,7 @@ export default function AnalysisScreen() {
 
   const selectedSport = useAppStore((s) => s.selectedSport)!;
   const selectedExercise = useAppStore((s) => s.selectedExercise);
+  const healthReadiness = useAppStore((s) => s.healthReadiness);
   const sessionSamples = useAppStore((s) => s.sessionSamples);
   const sessionStartTime = useAppStore((s) => s.sessionStartTime);
   const kinematics = useAppStore((s) => s.kinematics);
@@ -150,6 +151,7 @@ export default function AnalysisScreen() {
             reps,
             punches,
             swings,
+            readinessScore: healthReadiness?.score,
             drillFixations: drillFixations.map((f) => ({
               commandText: f.commandText,
               type: f.type,
@@ -214,15 +216,16 @@ export default function AnalysisScreen() {
 
   return (
     <motion.div
-      className="mx-auto min-h-dvh max-w-lg px-5 py-10"
+      className="mx-auto min-h-dvh max-w-lg bg-background px-5 py-10"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
     >
-      <h2 className="mb-6 text-2xl font-bold">Анализ тренировки</h2>
+      <h2 className="mb-6 text-2xl font-bold text-foreground">Анализ тренировки</h2>
       {!loading && (
         <p
           className={`mb-3 text-xs ${
-            source === "gemini" ? "text-emerald-600" : "text-amber-600"
+            source === "gemini" ? "text-success" : "text-warning"
           }`}
         >
           Источник анализа: {source === "gemini" ? "Gemini AI" : "Fallback"}
@@ -260,12 +263,12 @@ export default function AnalysisScreen() {
             {drillFixations.map((f, i) => (
               <li
                 key={`${f.commandId}-${i}`}
-                className="flex justify-between gap-2 border-b border-slate-100 pb-2"
+                className="flex justify-between gap-2 border-b border-border pb-2"
               >
                 <span>{f.commandText}</span>
                 <span
                   className={
-                    f.fixed ? "text-emerald-600" : "text-amber-600"
+                    f.fixed ? "text-success" : "text-warning"
                   }
                 >
                   {f.speedMs > 0
@@ -285,8 +288,8 @@ export default function AnalysisScreen() {
       <Card>
         {loading ? (
           <div className="space-y-3 py-6">
-            <div className="h-4 animate-pulse rounded bg-slate-100" />
-            <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100" />
+            <div className="h-4 animate-pulse rounded bg-border" />
+            <div className="h-4 w-3/4 animate-pulse rounded bg-border" />
             <p className="text-center text-sm text-muted">
               Биомеханический разбор техники и план тренировок…
             </p>
@@ -300,7 +303,7 @@ export default function AnalysisScreen() {
                 : "Локальный анализ (Gemini недоступен)"}
             </p>
             {source === "fallback" && analysisReason && (
-              <p className="mt-1 text-[10px] text-amber-700">
+              <p className="mt-1 text-[10px] text-warning">
                 Причина fallback: {analysisReason}
               </p>
             )}

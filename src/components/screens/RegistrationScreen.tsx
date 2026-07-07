@@ -38,11 +38,12 @@ export default function RegistrationScreen() {
 
   return (
     <motion.div
-      className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-10"
+      className="mx-auto flex min-h-dvh max-w-md flex-col justify-center bg-background px-6 py-10"
       initial={{ opacity: 0, x: 30 }}
       animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
     >
-      <h2 className="mb-2 text-2xl font-bold">
+      <h2 className="mb-2 text-2xl font-bold text-foreground">
         {existing ? "Редактирование профиля" : "Добро пожаловать"}
       </h2>
       <p className="mb-8 text-sm text-muted">
@@ -51,7 +52,7 @@ export default function RegistrationScreen() {
 
       <Card>
         <form onSubmit={submit} className="space-y-4">
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-foreground-secondary">
             Рост (см)
             <input
               type="number"
@@ -61,7 +62,7 @@ export default function RegistrationScreen() {
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-foreground-secondary">
             Вес (кг)
             <input
               type="number"
@@ -71,7 +72,7 @@ export default function RegistrationScreen() {
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-foreground-secondary">
             Возраст
             <input
               type="number"
@@ -83,7 +84,9 @@ export default function RegistrationScreen() {
           </label>
 
           <fieldset>
-            <legend className="text-sm font-medium text-slate-700">Цель</legend>
+            <legend className="text-sm font-medium text-foreground-secondary">
+              Цель
+            </legend>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {GOALS.map((g) => (
                 <button
@@ -92,8 +95,8 @@ export default function RegistrationScreen() {
                   onClick={() => setGoal(g.id)}
                   className={`rounded-xl border px-3 py-2 text-left text-xs transition ${
                     goal === g.id
-                      ? "border-primary bg-sky-50 text-primary"
-                      : "border-slate-200 hover:border-slate-300"
+                      ? "border-primary bg-[var(--primary-muted)] text-primary"
+                      : "border-border bg-surface text-foreground-secondary hover:border-primary/50"
                   }`}
                 >
                   {g.label}
@@ -102,12 +105,12 @@ export default function RegistrationScreen() {
             </div>
           </fieldset>
 
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-foreground-secondary">
             Травмы / ограничения (необязательно)
             <textarea
               value={injuries}
               onChange={(e) => setInjuries(e.target.value)}
-              className="mt-1 min-h-[72px] w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-sky-100"
+              className="mt-1 min-h-[72px] w-full resize-none"
               placeholder="Например: больное колено, проблемы со спиной"
             />
           </label>

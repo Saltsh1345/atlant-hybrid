@@ -48,6 +48,48 @@ export interface PostureReport {
   alignment: string;
 }
 
+export interface HealthSleepRecord {
+  startTime: string;
+  endTime: string;
+  durationMin: number;
+  phases?: Array<{ phase: string; durationMin: number }>;
+}
+
+export interface HealthHeartRatePoint {
+  t: string;
+  bpm: number;
+}
+
+export interface HealthMetricsSnapshot {
+  fetchedAt: string;
+  sleep?: {
+    lastNight?: HealthSleepRecord | null;
+  };
+  heartRate?: {
+    restingBpm?: number | null;
+    points?: HealthHeartRatePoint[];
+  };
+  spo2?: {
+    latest?: number | null;
+  };
+  stress?: {
+    latest?: number | null;
+  };
+}
+
+export interface HealthReadinessBreakdown {
+  sleepScore: number;
+  hrScore: number;
+  spo2Score: number;
+  stressScore: number;
+}
+
+export interface HealthReadiness {
+  score: number;
+  breakdown: HealthReadinessBreakdown;
+  metrics: HealthMetricsSnapshot;
+}
+
 export type Sport = "strength" | "boxing" | "tennis";
 
 export type StrengthExercise = "squat" | "bench" | "lunge";

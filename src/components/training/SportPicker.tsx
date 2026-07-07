@@ -66,6 +66,7 @@ export default function SportPicker({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.15 }}
           className={compact ? "space-y-2" : "space-y-3"}
         >
           {SPORTS.map((s, i) => (
@@ -75,15 +76,15 @@ export default function SportPicker({
               onClick={() => selectSport(s.id)}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
+              transition={{ delay: i * 0.04, duration: 0.15 }}
               className="relative z-10 w-full cursor-pointer text-left"
             >
               <Card
-                className={`flex items-center gap-3 transition hover:shadow-md hover:ring-2 hover:ring-cyan-100 ${compact ? "!py-3" : ""}`}
+                className={`flex items-center gap-3 transition hover:ring-2 hover:ring-[var(--primary)]/30 ${compact ? "!py-3" : ""}`}
               >
                 <span className={compact ? "text-2xl" : "text-3xl"}>{s.emoji}</span>
                 <div>
-                  <p className="font-semibold text-slate-900">{s.title}</p>
+                  <p className="font-semibold text-foreground">{s.title}</p>
                   <p className="text-sm text-muted">{s.desc}</p>
                 </div>
               </Card>
@@ -96,11 +97,12 @@ export default function SportPicker({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.15 }}
         >
           <button
             type="button"
             onClick={() => setPickingExercise(false)}
-            className="mb-3 text-sm font-medium text-cyan-700"
+            className="mb-3 text-sm font-medium text-primary"
           >
             ← Назад к спортам
           </button>
@@ -112,11 +114,11 @@ export default function SportPicker({
                 onClick={() => onSelect("strength", ex.id)}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06 }}
+                transition={{ delay: i * 0.04, duration: 0.15 }}
                 className="relative z-10 w-full cursor-pointer text-left"
               >
-                <Card className="transition hover:shadow-md hover:ring-2 hover:ring-emerald-100">
-                  <p className="font-semibold">{ex.title}</p>
+                <Card className="transition hover:ring-2 hover:ring-[var(--accent)]/30">
+                  <p className="font-semibold text-foreground">{ex.title}</p>
                   <p className="text-sm text-muted">{ex.desc}</p>
                 </Card>
               </motion.button>

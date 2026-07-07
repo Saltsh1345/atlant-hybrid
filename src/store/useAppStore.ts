@@ -11,6 +11,7 @@ import type {
   KinematicSample,
   SessionSummary,
   TrackingMode,
+  HealthReadiness,
 } from "@/types";
 import { canTransition, trackingModeForPhase } from "@/lib/stateMachine";
 import { simulateBodyComposition } from "@/lib/calibration/bodySimulator";
@@ -61,6 +62,8 @@ interface AppStore {
   calibrationScriptIndex: number;
   voiceMuted: boolean;
   rescanPending: boolean;
+  healthReadiness: HealthReadiness | null;
+  healthConnected: boolean;
 
   setPhase: (phase: AppPhase) => boolean;
   setProfile: (profile: UserProfile) => void;
@@ -93,6 +96,8 @@ interface AppStore {
   requestRescan: () => void;
   clearRescanPending: () => void;
   setVoiceMuted: (muted: boolean) => void;
+  refreshHealthReadiness: () => Promise<HealthReadiness | null>;
+  clearHealthConnection: () => void;
   resetAllData: () => void;
   /** Default profile for quick training without registration */
   ensureProfile: () => UserProfile;
@@ -118,6 +123,8 @@ export const useAppStore = create<AppStore>()(
       calibrationScriptIndex: 0,
       voiceMuted: false,
       rescanPending: false,
+      healthReadiness: null,
+      healthConnected: false,
 
       setPhase: (phase) => {
         const current = get().phase;
@@ -236,6 +243,25 @@ export const useAppStore = create<AppStore>()(
         set({ voiceMuted: muted });
       },
 
+      refreshHealthReadiness: async () => {
+        try {
+          const res = await fetch("/api/health/readiness", { cache: "no-store" });
+          if (!res.ok) {
+            set({ healthConnected: false, healthReadiness: null });
+            return null;
+          }
+          const readiness = (await res.json()) as HealthReadiness;
+          set({ healthReadiness: readiness, healthConnected: true });
+          return readiness;
+        } catch {
+          set({ healthConnected: false, healthReadiness: null });
+          return null;
+        }
+      },
+
+      clearHealthConnection: () =>
+        set({ healthConnected: false, healthReadiness: null }),
+
       resetAllData: () => {
         applyVoiceMuted(false);
         set({
@@ -246,6 +272,8 @@ export const useAppStore = create<AppStore>()(
           lastSession: null,
           sessionHistory: [],
           voiceMuted: false,
+          healthReadiness: null,
+          healthConnected: false,
         });
       },
 
@@ -265,6 +293,8 @@ export const useAppStore = create<AppStore>()(
         lastSession: s.lastSession,
         sessionHistory: s.sessionHistory,
         voiceMuted: s.voiceMuted,
+        healthReadiness: s.healthReadiness,
+        healthConnected: s.healthConnected,
         phase:
           s.phase === "training" ||
           s.phase === "settings" ||

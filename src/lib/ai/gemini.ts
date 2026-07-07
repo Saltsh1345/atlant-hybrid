@@ -75,6 +75,7 @@ type AnalysisPayload = {
   reps?: number;
   punches?: number;
   swings?: number;
+  readinessScore?: number;
   drillFixations?: Array<{
     commandText: string;
     type: string;
@@ -128,6 +129,7 @@ ${sportBiomechHints(payload.sport, payload.exercise)}
 Лучший зафиксированный удар/замах: ${best} м/с
 Худший из зафиксированных: ${worstFixed || "нет"} м/с
 Оценка техники (форма): ${payload.formScore ?? "нет"}%
+Readiness (0-100): ${payload.readinessScore ?? "нет"}
 Средняя точность drill: ${avgAcc}%
 Зафиксировано удачно: ${fixed.length} из ${drills.length || 0}
 Пропусков: ${skipped}

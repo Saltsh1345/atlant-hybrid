@@ -43,7 +43,7 @@ export default function DashboardShell({
 
   return (
     <div className="dashboard-ref flex min-h-dvh">
-      <aside className="hidden w-[72px] shrink-0 flex-col items-center gap-1 border-r border-slate-200/80 bg-white py-6 lg:flex xl:w-20">
+      <aside className="hidden w-[72px] shrink-0 flex-col items-center gap-1 border-r border-[var(--border)] bg-[var(--dash-sidebar)] py-6 lg:flex xl:w-20">
         <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 text-lg text-white shadow-md">
           A
         </div>
@@ -52,10 +52,10 @@ export default function DashboardShell({
             key={item.title}
             type="button"
             onClick={() => go(item.phase, item.focusSport)}
-            className="group flex w-full flex-col items-center gap-0.5 px-1 py-2.5 text-[9px] text-slate-500 transition hover:text-sky-600"
+            className="group flex w-full flex-col items-center gap-0.5 px-1 py-2.5 text-[9px] text-[var(--dash-muted)] transition hover:text-[var(--primary)]"
             title={item.title}
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl text-lg transition group-hover:bg-sky-50">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl text-lg transition group-hover:bg-[var(--primary-muted)]">
               {item.icon}
             </span>
             <span className="max-w-[64px] truncate text-center leading-tight">
@@ -68,16 +68,16 @@ export default function DashboardShell({
       <div className="min-w-0 flex-1 px-4 py-5 lg:px-6 xl:px-8">
         <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-600">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
               Atlant Hybrid
             </p>
-            <h1 className="text-2xl font-bold text-slate-900">{userName}</h1>
-            <p className="text-xs text-slate-500">
+            <h1 className="text-2xl font-bold text-[var(--dash-text)]">{userName}</h1>
+            <p className="text-xs text-[var(--dash-muted)]">
               Модульный дашборд · перетаскивайте виджеты в режиме редактирования
             </p>
           </div>
           {geminiOk !== null && (
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-[10px] text-slate-500">
+            <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 font-mono text-[10px] text-[var(--muted)]">
               Gemini {geminiOk ? "ON" : "local"}
             </span>
           )}

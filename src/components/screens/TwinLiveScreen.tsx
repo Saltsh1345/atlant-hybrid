@@ -38,7 +38,7 @@ export default function TwinLiveScreen() {
   }, [tick]);
 
   return (
-    <div className="relative min-h-dvh bg-slate-50">
+    <div className="relative min-h-dvh bg-background">
       <video
         ref={videoRef}
         className="absolute inset-0 h-full w-full scale-x-[-1] object-cover opacity-30"
@@ -58,20 +58,20 @@ export default function TwinLiveScreen() {
         <button
           type="button"
           onClick={() => setPhase("dashboard")}
-          className="mb-4 self-start text-sm text-slate-600 hover:text-slate-900"
+          className="mb-4 self-start text-sm text-foreground-secondary hover:text-foreground"
         >
           ← Дашборд
         </button>
 
-        <h1 className="mb-1 text-xl font-bold text-slate-900">
+        <h1 className="mb-1 text-xl font-bold text-foreground">
           Цифровой двойник
         </h1>
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-xs text-muted">
           Анатомический mesh · сетка пола · подсветка состава и техники
         </p>
 
         {latchedBody && (
-          <p className="mb-3 text-xs text-emerald-600">
+          <p className="mb-3 text-xs text-success">
             Жир {latchedBody.fatPercent}% · Мышцы {latchedBody.musclePercent}%
             {criticalMeshes.length > 0
               ? ` · критичных зон: ${criticalMeshes.length}`
@@ -91,7 +91,7 @@ export default function TwinLiveScreen() {
           />
         </div>
 
-        <p className="mt-4 text-center text-[10px] text-slate-500">
+        <p className="mt-4 text-center text-[10px] text-muted">
           После скана — жир (янтарный) и мышцы (зелёный). После слабой техники —
           красная пульсация критичных групп.
         </p>

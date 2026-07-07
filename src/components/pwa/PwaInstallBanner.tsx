@@ -43,8 +43,8 @@ export default function PwaInstallBanner() {
   };
 
   return (
-    <Card className="mb-4 border-sky-100 bg-sky-50">
-      <p className="text-sm font-medium text-slate-800">
+    <Card className="mb-4 border-[var(--primary)]/20 bg-[var(--primary-muted)]">
+      <p className="text-sm font-medium text-foreground">
         Установить Atlant-Hybrid
       </p>
       <p className="mt-1 text-xs text-muted">

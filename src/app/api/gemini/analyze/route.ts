@@ -18,6 +18,7 @@ export async function POST(req: Request) {
       reps: body.reps,
       punches: body.punches,
       swings: body.swings,
+      readinessScore: body.readinessScore,
       exercise: body.exercise,
       drillFixations: body.drillFixations,
     });

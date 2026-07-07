@@ -66,23 +66,23 @@ function StepsRing({ value }: { value: number }) {
   return (
     <div className="flex h-full flex-col items-center justify-center py-2">
       <svg width="88" height="88" viewBox="0 0 88 88">
-        <circle cx="44" cy="44" r={r} fill="none" stroke="#e8edf4" strokeWidth="8" />
+        <circle cx="44" cy="44" r={r} fill="none" stroke="var(--border)" strokeWidth="8" />
         <circle
           cx="44"
           cy="44"
           r={r}
           fill="none"
-          stroke="#2b9fff"
+          stroke="var(--primary)"
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={`${(pct / 100) * c} ${c}`}
           transform="rotate(-90 44 44)"
         />
-        <text x="44" y="48" textAnchor="middle" fontSize="14" fontWeight="700" fill="#1e293b">
+        <text x="44" y="48" textAnchor="middle" fontSize="14" fontWeight="700" fill="var(--foreground)">
           {value > 9999 ? `${Math.round(value / 1000)}k` : value}
         </text>
       </svg>
-      <p className="text-[10px] text-slate-500">ед. активности</p>
+      <p className="text-[10px] text-muted">ед. активности</p>
     </div>
   );
 }
@@ -92,20 +92,20 @@ function ArcLoad({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center">
       <svg width="110" height="62" viewBox="0 0 110 62">
-        <path d="M 10 52 A 45 45 0 0 1 100 52" fill="none" stroke="#e8edf4" strokeWidth="9" />
+        <path d="M 10 52 A 45 45 0 0 1 100 52" fill="none" stroke="var(--border)" strokeWidth="9" />
         <path
           d="M 10 52 A 45 45 0 0 1 100 52"
           fill="none"
-          stroke="#2b9fff"
+          stroke="var(--primary)"
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={`${pct * 141} 141`}
         />
-        <text x="55" y="48" textAnchor="middle" fontSize="20" fontWeight="700" fill="#1e293b">
+        <text x="55" y="48" textAnchor="middle" fontSize="20" fontWeight="700" fill="var(--foreground)">
           {value}
         </text>
       </svg>
-      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="text-[10px] text-muted">{label}</p>
     </div>
   );
 }
@@ -184,24 +184,24 @@ export function renderDashboardWidget(
     case "pulse":
       return (
         <div className="flex h-full flex-col p-1">
-          <p className="mb-1 text-xs font-semibold text-slate-700">Пульс / VBT</p>
+          <p className="mb-1 text-xs font-semibold text-foreground-secondary">Пульс / VBT</p>
           {pulseData.length > 1 ? (
             <div className="min-h-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={pulseData}>
                   <defs>
                     <linearGradient id="vbtFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2b9fff" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#2b9fff" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8 }} />
-                  <Area type="monotone" dataKey="v" stroke="#2b9fff" fill="url(#vbtFill)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="v" stroke="var(--primary)" fill="url(#vbtFill)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="flex flex-1 items-center justify-center text-xs text-slate-400">
+            <p className="flex flex-1 items-center justify-center text-xs text-muted">
               Пройдите тренировку для графика VBT
             </p>
           )}
@@ -211,7 +211,7 @@ export function renderDashboardWidget(
     case "water":
       return (
         <div className="flex h-full flex-col p-1">
-          <p className="text-xs font-semibold text-slate-700">Гидратация</p>
+          <p className="text-xs font-semibold text-foreground-secondary">Гидратация</p>
           <div className="mt-2 flex flex-1 items-end gap-1">
             {waterBars.map((h, i) => (
               <div
@@ -221,7 +221,7 @@ export function renderDashboardWidget(
               />
             ))}
           </div>
-          <p className="mt-2 text-center text-sm font-bold text-slate-800">
+          <p className="mt-2 text-center text-sm font-bold text-foreground">
             {(hydrationPct / 62).toFixed(1)} л экв.
           </p>
         </div>
@@ -230,11 +230,11 @@ export function renderDashboardWidget(
     case "sleep":
       return (
         <div className="flex h-full flex-col p-1">
-          <p className="text-xs font-semibold text-slate-700">Восстановление</p>
-          <p className="text-2xl font-bold text-slate-900">
+          <p className="text-xs font-semibold text-foreground-secondary">Восстановление</p>
+          <p className="text-2xl font-bold text-foreground">
             {Math.max(5.5, 9.2 - recoveryH * 0.08).toFixed(1)} ч
           </p>
-          <p className="text-[10px] text-slate-500">сна экв. · отдых {recoveryH}ч</p>
+          <p className="text-[10px] text-muted">сна экв. · отдых {recoveryH}ч</p>
           <div className="mt-2 flex flex-1 items-end gap-0.5">
             {[1, 2.5, 4, 3, 2, 1.2].map((h, i) => (
               <div
@@ -250,7 +250,7 @@ export function renderDashboardWidget(
     case "macros":
       return (
         <div className="h-full overflow-auto p-1">
-          <p className="mb-2 text-xs font-semibold text-slate-700">Состав тела · ИМТ {bmi}</p>
+          <p className="mb-2 text-xs font-semibold text-foreground-secondary">Состав тела · ИМТ {bmi}</p>
           {[
             { n: "Жир", v: ctx.latchedBody?.fatPercent ?? "—", p: ctx.latchedBody?.fatPercent ?? 0, c: "bg-amber-400" },
             { n: "Мышцы", v: ctx.latchedBody?.musclePercent ?? "—", p: ctx.latchedBody?.musclePercent ?? 0, c: "bg-emerald-400" },
@@ -261,7 +261,7 @@ export function renderDashboardWidget(
                 <span>{row.n}</span>
                 <span className="font-mono">{typeof row.v === "number" ? `${row.v}%` : row.v}</span>
               </div>
-              <div className="h-1.5 rounded-full bg-slate-100">
+              <div className="h-1.5 rounded-full bg-border">
                 <div className={`h-full rounded-full ${row.c}`} style={{ width: `${row.p}%` }} />
               </div>
             </div>
@@ -277,13 +277,13 @@ export function renderDashboardWidget(
     case "run":
       return (
         <div className="flex h-full flex-col justify-center p-2">
-          <p className="text-xs font-semibold text-slate-700">Дистанция</p>
-          <p className="text-xl font-bold text-slate-900">
+          <p className="text-xs font-semibold text-foreground-secondary">Дистанция</p>
+          <p className="text-xl font-bold text-foreground">
             {ctx.lastSession
               ? `${(ctx.lastSession.durationSec / 60 / 6).toFixed(2)} км`
               : "—"}
           </p>
-          <svg viewBox="0 0 80 36" className="mt-2 h-8 w-full text-sky-400">
+          <svg viewBox="0 0 80 36" className="mt-2 h-8 w-full text-primary">
             <path d="M6 28 Q30 6 50 18 T74 10" fill="none" stroke="currentColor" strokeWidth="2" />
           </svg>
         </div>
@@ -324,7 +324,7 @@ export function renderDashboardWidget(
           className="h-full !shadow-none"
         />
       ) : (
-        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-slate-500">
+        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted">
           Заполните профиль в настройках
         </div>
       );
@@ -332,11 +332,11 @@ export function renderDashboardWidget(
     case "monitoring":
       return (
         <div className="flex h-full flex-col justify-center p-3">
-          <p className="text-xs font-semibold text-cyan-700">VBT · Gemini</p>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="text-xs font-semibold text-primary">VBT · Gemini</p>
+          <p className="mt-2 text-sm text-foreground-secondary">
             {ctx.geminiOk ? "ИИ-анализ онлайн" : "Локальный fallback"}
           </p>
-          <p className="mt-1 text-[10px] text-slate-400">
+          <p className="mt-1 text-[10px] text-muted">
             {ctx.bodyDataLocked ? "Двойник зафиксирован" : "Скан не обязателен"}
           </p>
         </div>
@@ -345,24 +345,24 @@ export function renderDashboardWidget(
     case "body-metrics":
       return ctx.showBodyTiles ? (
         <div className="grid h-full grid-cols-2 gap-2 p-2">
-          <div className="rounded-xl bg-amber-50 p-3 text-center">
-            <p className="text-[10px] text-amber-700">Жир</p>
-            <p className="text-xl font-bold text-amber-500">—</p>
+          <div className="rounded-xl border border-[var(--warning)]/30 bg-[var(--readiness-muted)] p-3 text-center">
+            <p className="text-[10px] text-readiness">Жир</p>
+            <p className="text-xl font-bold text-readiness">—</p>
           </div>
-          <div className="rounded-xl bg-emerald-50 p-3 text-center">
-            <p className="text-[10px] text-emerald-700">Мышцы</p>
-            <p className="text-xl font-bold text-emerald-500">—</p>
+          <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-muted)] p-3 text-center">
+            <p className="text-[10px] text-success">Мышцы</p>
+            <p className="text-xl font-bold text-success">—</p>
           </div>
         </div>
       ) : (
-        <p className="flex h-full items-center justify-center text-xs text-slate-400">Данные после скана</p>
+        <p className="flex h-full items-center justify-center text-xs text-muted">Данные после скана</p>
       );
 
     case "progress":
       return ctx.sessionHistory.length >= 2 ? (
         <ProgressChart history={ctx.sessionHistory} />
       ) : (
-        <p className="flex h-full items-center justify-center p-4 text-center text-xs text-slate-400">
+        <p className="flex h-full items-center justify-center p-4 text-center text-xs text-muted">
           Нужно минимум 2 тренировки для графика прогресса
         </p>
       );
@@ -371,7 +371,7 @@ export function renderDashboardWidget(
       return ctx.lastSession ? (
         <Card className="h-full overflow-auto !border-0 !shadow-none md:p-3">
           <p className="text-xs font-medium text-primary">Последняя тренировка</p>
-          <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+          <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted">
             <span>
               {ctx.lastSession.exercise
                 ? exerciseLabel(ctx.lastSession.exercise)
@@ -388,12 +388,12 @@ export function renderDashboardWidget(
           <div className="mt-2 h-20">
             <VelocityChart samples={ctx.lastSession.samples} height={80} />
           </div>
-          <p className="mt-2 line-clamp-4 text-xs text-slate-600">
+          <p className="mt-2 line-clamp-4 text-xs text-foreground-secondary">
             {ctx.lastSession.aiAnalysis}
           </p>
         </Card>
       ) : (
-        <p className="flex h-full items-center justify-center text-xs text-slate-400">
+        <p className="flex h-full items-center justify-center text-xs text-muted">
           Выберите тренировку выше
         </p>
       );
@@ -403,18 +403,18 @@ export function renderDashboardWidget(
         <Card className="h-full overflow-auto !border-0 !shadow-none md:p-3">
           <ul className="space-y-2">
             {ctx.sessionHistory.slice(0, 8).map((s, i) => (
-              <li key={`${s.completedAt}-${i}`} className="flex justify-between gap-2 border-b border-slate-100 pb-2 text-xs last:border-0">
-                <span className="text-slate-700">
+              <li key={`${s.completedAt}-${i}`} className="flex justify-between gap-2 border-b border-border pb-2 text-xs last:border-0">
+                <span className="text-foreground-secondary">
                   {s.exercise ? exerciseLabel(s.exercise) : SPORT_NAMES[s.sport]}
                   {s.formScore ? ` · ${s.formScore}%` : ""}
                 </span>
-                <span className="shrink-0 text-slate-400">{formatDate(s.completedAt)}</span>
+                <span className="shrink-0 text-muted">{formatDate(s.completedAt)}</span>
               </li>
             ))}
           </ul>
         </Card>
       ) : (
-        <p className="flex h-full items-center justify-center text-xs text-slate-400">
+        <p className="flex h-full items-center justify-center text-xs text-muted">
           История пуста
         </p>
       );

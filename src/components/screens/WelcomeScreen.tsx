@@ -14,28 +14,29 @@ export default function WelcomeScreen() {
   const ensureProfile = useAppStore((s) => s.ensureProfile);
 
   const startTraining = (sport: Sport, exercise?: StrengthExercise) => {
-    goToTraining(sport, exercise);
+    void goToTraining(sport, exercise);
   };
 
   return (
     <motion.div
-      className="mx-auto flex min-h-dvh max-w-lg flex-col px-5 py-8"
+      className="mx-auto flex min-h-dvh max-w-lg flex-col bg-background px-5 py-8"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
     >
       <div className="mb-6 text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-100 to-sky-100">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--primary-muted)]">
           <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
             <path
               d="M20 4 L36 34 H4 Z"
-              stroke="#0ea5e9"
+              stroke="var(--primary)"
               strokeWidth="2"
               fill="none"
             />
-            <circle cx="20" cy="24" r="4" fill="#10b981" />
+            <circle cx="20" cy="24" r="4" fill="var(--accent)" />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
           Atlant-Hybrid
         </h1>
         <p className="mt-1 text-sm text-muted">
@@ -43,14 +44,14 @@ export default function WelcomeScreen() {
         </p>
       </div>
 
-      <Card className="mb-4 !border-cyan-200/80 !bg-gradient-to-b from-white to-cyan-50/40">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700">
+      <Card className="mb-4 border-[var(--primary)]/20 bg-gradient-to-b from-[var(--surface)] to-[var(--primary-muted)]">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">
           Быстрый старт
         </p>
-        <h2 className="mt-1 text-lg font-bold text-slate-900">
+        <h2 className="mt-1 text-lg font-bold text-foreground">
           Выберите тренировку
         </h2>
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-xs text-muted">
           Скан тела не обязателен — камера сразу анализирует движения и удары
         </p>
         <SportPicker compact onSelect={startTraining} />
@@ -70,14 +71,13 @@ export default function WelcomeScreen() {
         <Button
           variant="ghost"
           size="md"
-          className="!bg-white"
           onClick={() => setPhase(profile ? "dashboard" : "registration")}
         >
           {profile ? "Дашборд" : "Профиль"}
         </Button>
       </div>
 
-      <p className="mt-4 text-center text-[10px] text-slate-400">
+      <p className="mt-4 text-center text-[10px] text-muted">
         Состав тела — опционально. Тренировка и Gemini-анализ доступны сразу.
       </p>
     </motion.div>

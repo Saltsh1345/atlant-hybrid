@@ -12,6 +12,26 @@ npm run dev
 
 Откройте http://localhost:3000
 
+## Huawei Health Kit (OAuth + Readiness)
+
+1. В Huawei Developer Console создайте проект и включите Health Kit.
+2. В настройках OAuth добавьте Redirect URI:
+   `http://localhost:3000/api/health/huawei/callback`
+3. Скопируйте `Client ID` и `Client Secret` в `.env.local`:
+
+```bash
+HUAWEI_CLIENT_ID=...
+HUAWEI_CLIENT_SECRET=...
+HUAWEI_REDIRECT_URI=http://localhost:3000/api/health/huawei/callback
+# Optional overrides:
+# HUAWEI_OAUTH_BASE=https://oauth-login.cloud.huawei.com/oauth2/v3
+# HUAWEI_HEALTH_API_BASE=https://health-api.cloud.huawei.com
+# HUAWEI_HEALTH_SCOPES="openid profile ..."
+```
+
+После этого в `Settings` можно нажать "Подключить Huawei".  
+Перед стартом тренировки приложение обновляет данные Health Kit и считает readiness 0-100.
+
 ## 3D-аватар
 
 Положите **один** из файлов в `public/`:

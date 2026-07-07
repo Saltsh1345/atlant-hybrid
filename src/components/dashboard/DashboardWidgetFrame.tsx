@@ -20,19 +20,19 @@ export default function DashboardWidgetFrame({
 
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden rounded-2xl bg-white/80 shadow-sm backdrop-blur-sm ${
+      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/90 shadow-sm backdrop-blur-sm ${
         editMode
-          ? "ring-2 ring-cyan-400/40 ring-offset-1 ring-offset-slate-50"
+          ? "ring-2 ring-[var(--primary)]/40 ring-offset-1 ring-offset-[var(--background)]"
           : ""
       }`}
     >
       {editMode && (
-        <div className="dashboard-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-cyan-100 bg-gradient-to-r from-cyan-50/90 to-white px-3 py-1.5 active:cursor-grabbing">
+        <div className="dashboard-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--primary-muted)] px-3 py-1.5 active:cursor-grabbing">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="text-slate-400" aria-hidden>
+            <span className="text-[var(--muted)]" aria-hidden>
               ⠿
             </span>
-            <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-cyan-800">
+            <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
               {meta.icon} {meta.title}
             </span>
           </div>
@@ -40,7 +40,7 @@ export default function DashboardWidgetFrame({
             <button
               type="button"
               onClick={() => onRemove(id)}
-              className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600"
+              className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-[var(--muted)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
               title="Убрать виджет"
             >
               ✕

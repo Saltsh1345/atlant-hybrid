@@ -45,7 +45,7 @@ export default function SessionStats({
     {
       label: "Длительность",
       value: `${mins}:${secs.toString().padStart(2, "0")}`,
-      color: "text-slate-800",
+      color: "text-foreground",
     },
     {
       label: "Техника",
@@ -54,39 +54,39 @@ export default function SessionStats({
       sub: formScoreLabel(formScore),
       color:
         formScore >= 85
-          ? "text-emerald-600"
+          ? "text-success"
           : formScore >= 70
-            ? "text-sky-600"
-            : "text-amber-600",
+            ? "text-primary"
+            : "text-warning",
     },
     {
       label: "Ø Скорость",
       value: `${avgVelocity}`,
       unit: "м/с",
-      color: "text-sky-600",
+      color: "text-primary",
     },
     {
       label: "Пик VBT",
       value: `${peakVelocity}`,
       unit: "м/с",
-      color: "text-violet-600",
+      color: "text-accent",
     },
     {
       label: "Усталость",
       value: `${fatigue}`,
       unit: "%",
-      color: "text-amber-600",
+      color: "text-warning",
     },
   ];
 
   if (reps != null && reps > 0) {
-    items.push({ label: "Повторы", value: `${reps}`, color: "text-emerald-600" });
+    items.push({ label: "Повторы", value: `${reps}`, color: "text-success" });
   }
   if (punches != null && punches > 0) {
-    items.push({ label: "Удары", value: `${punches}`, color: "text-orange-600" });
+    items.push({ label: "Удары", value: `${punches}`, color: "text-readiness" });
   }
   if (swings != null && swings > 0) {
-    items.push({ label: "Замахи", value: `${swings}`, color: "text-emerald-600" });
+    items.push({ label: "Замахи", value: `${swings}`, color: "text-success" });
   }
 
   return (
@@ -96,11 +96,14 @@ export default function SessionStats({
       </p>
       <div className="grid grid-cols-2 gap-3">
         {items.map((item) => (
-          <div key={item.label} className="rounded-xl bg-slate-50 px-3 py-2">
+          <div
+            key={item.label}
+            className="rounded-xl bg-background-secondary px-3 py-2"
+          >
             <p className="text-[10px] uppercase tracking-wide text-muted">
               {item.label}
             </p>
-            <p className={`text-lg font-bold ${item.color}`}>
+            <p className={`text-lg font-bold tabular-nums ${item.color}`}>
               {item.value}
               {item.unit && (
                 <span className="ml-0.5 text-[10px] font-normal text-muted">
