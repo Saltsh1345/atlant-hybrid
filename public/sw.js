@@ -1,4 +1,4 @@
-const CACHE = "atlant-v6";
+const CACHE = "atlant-v9";
 const ASSETS = ["/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

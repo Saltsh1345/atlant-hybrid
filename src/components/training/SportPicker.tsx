@@ -3,31 +3,32 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Card from "@/components/ui/Card";
+import AppIcon, { type AppIconName } from "@/components/ui/AppIcon";
 import type { Sport, StrengthExercise } from "@/types";
 
 export const SPORTS: {
   id: Sport;
   title: string;
   desc: string;
-  emoji: string;
+  icon: AppIconName;
 }[] = [
   {
     id: "boxing",
     title: "Бокс",
     desc: "Удары · скорость · точность",
-    emoji: "🥊",
+    icon: "boxing",
   },
   {
     id: "tennis",
     title: "Теннис",
     desc: "Замах · прогиб · VBT",
-    emoji: "🎾",
+    icon: "tennis",
   },
   {
     id: "strength",
     title: "Силовые",
     desc: "Присед · жим · выпады",
-    emoji: "🏋️",
+    icon: "strength",
   },
 ];
 
@@ -82,7 +83,9 @@ export default function SportPicker({
               <Card
                 className={`flex items-center gap-3 transition hover:ring-2 hover:ring-[var(--primary)]/30 ${compact ? "!py-3" : ""}`}
               >
-                <span className={compact ? "text-2xl" : "text-3xl"}>{s.emoji}</span>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)]/70 text-[var(--primary)]">
+                  <AppIcon name={s.icon} className={compact ? "h-4 w-4" : "h-5 w-5"} />
+                </span>
                 <div>
                   <p className="font-semibold text-foreground">{s.title}</p>
                   <p className="text-sm text-muted">{s.desc}</p>

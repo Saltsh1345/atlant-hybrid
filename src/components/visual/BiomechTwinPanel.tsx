@@ -3,9 +3,7 @@
 import { useMemo } from "react";
 import AvatarViewer from "@/components/three/AvatarViewer";
 import { useAvatarAsset } from "@/hooks/useAvatarAsset";
-import {
-  criticalMusclesFromSession,
-} from "@/lib/three/muscleGroups";
+import { criticalMusclesFromSession } from "@/lib/three/muscleGroups";
 import type { LatchedBodyData, SessionSummary } from "@/types";
 
 interface BiomechTwinPanelProps {
@@ -15,9 +13,10 @@ interface BiomechTwinPanelProps {
   compact?: boolean;
   showHud?: boolean;
   className?: string;
-  /** Last session — red critical muscles when technique was poor. */
   lastSession?: SessionSummary | null;
   criticalMeshes?: string[];
+  /** Soft dashboard look: no wireframe, no red “critical” scare, calm HUD */
+  calm?: boolean;
 }
 
 export default function BiomechTwinPanel({
@@ -29,6 +28,7 @@ export default function BiomechTwinPanel({
   className = "",
   lastSession = null,
   criticalMeshes: criticalOverride,
+  calm = false,
 }: BiomechTwinPanelProps) {
   const { asset, ready, error: assetError } = useAvatarAsset();
   const fat = latchedBody?.fatPercent ?? 22;
@@ -36,15 +36,22 @@ export default function BiomechTwinPanel({
   const compositionKnown = locked && !!latchedBody;
 
   const criticalMeshes = useMemo(() => {
+    // Explicit override always wins (live twin / training technique)
     if (criticalOverride?.length) return criticalOverride;
+    // Dashboard calm preview: no scare red
+    if (calm) return [];
     return criticalMusclesFromSession(lastSession);
-  }, [criticalOverride, lastSession]);
+  }, [calm, criticalOverride, lastSession]);
 
   const hasCritical = criticalMeshes.length > 0;
+  const techniqueHint =
+    !calm && lastSession?.formScore != null && lastSession.formScore < 55;
 
   return (
     <div
       className={`atlant-twin-panel relative overflow-hidden rounded-2xl ${
+        calm ? "atlant-twin-panel--calm" : ""
+      } ${
         compact
           ? "h-48"
           : tall
@@ -52,50 +59,88 @@ export default function BiomechTwinPanel({
             : "h-64"
       } ${className}`}
     >
-      <div className="atlant-twin-bg absolute inset-0" />
+      <div
+        className={`absolute inset-0 ${
+          calm ? "atlant-twin-bg-calm" : "atlant-twin-bg"
+        }`}
+      />
 
       {showHud && (
         <>
-          <div className="atlant-hud-pill absolute left-3 top-3 z-10">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                hasCritical ? "bg-red-500" : "bg-orange-400"
-              }`}
-            />
-            Биомеханика
-          </div>
           <div
-            className={`atlant-hud-pill absolute right-3 top-3 z-10 ${
-              hasCritical
-                ? "!border-red-200 !text-red-700"
-                : "!border-emerald-200 !text-emerald-700"
+            className={`atlant-hud-pill absolute left-3 top-3 z-10 ${
+              calm ? "atlant-hud-pill--calm" : ""
             }`}
           >
             <span
-              className={`h-2 w-2 animate-pulse rounded-full ${
-                hasCritical ? "bg-red-500" : "bg-emerald-500"
+              className={`h-2 w-2 rounded-full ${
+                calm
+                  ? "bg-[var(--neon-lime,#ccff00)]"
+                  : hasCritical
+                    ? "bg-red-500"
+                    : "bg-orange-400"
               }`}
             />
-            {hasCritical ? "Критично" : "В сети"}
+            {calm ? "Голограмма" : "Биомеханика"}
+          </div>
+          <div
+            className={`atlant-hud-pill absolute right-3 top-3 z-10 ${
+              calm
+                ? "atlant-hud-pill--calm"
+                : hasCritical
+                  ? "!border-red-200 !text-red-700"
+                  : "!border-emerald-200 !text-emerald-700"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                calm
+                  ? compositionKnown
+                    ? "bg-cyan-400"
+                    : "bg-cyan-700"
+                  : hasCritical
+                    ? "animate-pulse bg-red-500"
+                    : "animate-pulse bg-emerald-500"
+              }`}
+            />
+            {calm
+              ? compositionKnown
+                ? "Скан OK"
+                : "MESH"
+              : hasCritical
+                ? "Критично"
+                : "В сети"}
           </div>
           {compositionKnown && (
             <>
-              <div className="atlant-hud-tag absolute bottom-3 left-3 z-10">
-                [ЖИР: {fat}%]
+              <div
+                className={`atlant-hud-tag absolute bottom-3 left-3 z-10 ${
+                  calm ? "atlant-hud-tag--calm" : ""
+                }`}
+              >
+                Жир {fat}%
               </div>
-              <div className="atlant-hud-tag absolute bottom-3 right-3 z-10">
-                [МЫШЦЫ: {muscle}%]
+              <div
+                className={`atlant-hud-tag absolute bottom-3 right-3 z-10 ${
+                  calm ? "atlant-hud-tag--calm" : ""
+                }`}
+              >
+                Мышцы {muscle}%
               </div>
-              <div className="atlant-hud-tag absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
-                {hasCritical
-                  ? "[ТЕХНИКА: КРИТИЧНО]"
-                  : "[BIOMETRICS: STABLE]"}
-              </div>
+              {!calm && techniqueHint && (
+                <div className="atlant-hud-tag absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
+                  Техника: нужна работа
+                </div>
+              )}
             </>
           )}
           {!compositionKnown && (
-            <div className="atlant-hud-tag absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
-              [ОЖИДАНИЕ СКАНА]
+            <div
+              className={`atlant-hud-tag absolute bottom-3 left-1/2 z-10 -translate-x-1/2 ${
+                calm ? "atlant-hud-tag--calm" : ""
+              }`}
+            >
+              {calm ? "Пройдите скан для точного состава" : "Ожидание скана"}
             </div>
           )}
         </>
@@ -103,14 +148,14 @@ export default function BiomechTwinPanel({
 
       <div className="relative z-[2] h-full min-h-[12rem] p-1">
         {assetError ? (
-          <div className="flex h-full items-center justify-center rounded-xl bg-amber-50 text-center text-xs text-amber-800">
+          <div className="flex h-full items-center justify-center rounded-xl bg-white/5 text-center text-xs text-[#a3a3a3]">
             {assetError}
           </div>
         ) : (
           <AvatarViewer
             asset={asset ?? { url: "/avatar.glb", format: "glb" }}
             assetReady={ready}
-            showWireframe={!compositionKnown && !hasCritical}
+            showWireframe={false}
             compositionMode={compositionKnown}
             fatPercent={fat}
             musclePercent={muscle}
@@ -122,6 +167,7 @@ export default function BiomechTwinPanel({
             tall={tall}
             compact={compact}
             interactive
+            calmLighting={calm}
           />
         )}
       </div>

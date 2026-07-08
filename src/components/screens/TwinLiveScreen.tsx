@@ -67,7 +67,7 @@ export default function TwinLiveScreen() {
           Цифровой двойник
         </h1>
         <p className="mb-4 text-xs text-muted">
-          Анатомический mesh · сетка пола · подсветка состава и техники
+          Голографический mesh · мышцы и жир по скану · техника подсвечивается
         </p>
 
         {latchedBody && (
@@ -87,13 +87,14 @@ export default function TwinLiveScreen() {
             criticalMeshes={criticalMeshes}
             tall
             showHud
+            calm
             className="h-full min-h-[320px]"
           />
         </div>
 
         <p className="mt-4 text-center text-[10px] text-muted">
-          После скана — жир (янтарный) и мышцы (зелёный). После слабой техники —
-          красная пульсация критичных групп.
+          После скана жир теплее (янтарь), мышцы ярче (cyan). Слабая техника —
+          красная подсветка групп.
         </p>
 
         <Button

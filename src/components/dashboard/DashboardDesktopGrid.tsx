@@ -1,179 +1,161 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
-import dynamic from "next/dynamic";
-import type { Layout, LayoutItem } from "react-grid-layout";
-import { useContainerWidth } from "react-grid-layout";
-import Button from "@/components/ui/Button";
+import type { ReactNode } from "react";
+import DashboardWidgetFrame from "@/components/dashboard/DashboardWidgetFrame";
 import {
-  WIDGET_META,
-  allWidgetIds,
-  layoutForVisible,
+  dashboardSections,
+  type DashboardSection,
   type DashboardWidgetId,
 } from "@/lib/dashboard/widgets";
-import { useDashboardLayoutStore } from "@/store/useDashboardLayoutStore";
-import DashboardWidgetFrame from "@/components/dashboard/DashboardWidgetFrame";
-
-import "react-grid-layout/css/styles.css";
-import "react-resizable/css/styles.css";
-
-const GridLayout = dynamic(
-  () => import("react-grid-layout/legacy").then((m) => m.default),
-  { ssr: false }
-);
-
-const ROW_HEIGHT = 44;
-const COLS = 12;
 
 interface DashboardDesktopGridProps {
   widgets: Partial<Record<DashboardWidgetId, ReactNode>>;
   showBodyTiles?: boolean;
 }
 
+function WidgetCell({
+  id,
+  widgets,
+  className,
+}: {
+  id: DashboardWidgetId;
+  widgets: Partial<Record<DashboardWidgetId, ReactNode>>;
+  className?: string;
+}) {
+  return (
+    <div className={`min-h-0 ${className ?? ""}`}>
+      <DashboardWidgetFrame id={id}>
+        {widgets[id] ?? (
+          <div className="flex h-full min-h-[80px] items-center justify-center text-xs text-muted">
+            Нет данных
+          </div>
+        )}
+      </DashboardWidgetFrame>
+    </div>
+  );
+}
+
+function SectionHeader({ section }: { section: DashboardSection }) {
+  return (
+    <header className="mb-3">
+      <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
+        {section.title}
+      </h2>
+      {section.subtitle && (
+        <p className="mt-0.5 text-xs text-muted">{section.subtitle}</p>
+      )}
+    </header>
+  );
+}
+
+function HeroSection({
+  section,
+  widgets,
+}: {
+  section: DashboardSection;
+  widgets: Partial<Record<DashboardWidgetId, ReactNode>>;
+}) {
+  return (
+    <section>
+      <SectionHeader section={section} />
+      <div className="atlant-dash-hero">
+        <WidgetCell id="sport-picker" widgets={widgets} className="atlant-dash-sport" />
+        <WidgetCell id="rings" widgets={widgets} className="atlant-dash-rings" />
+        <div className="atlant-dash-metrics">
+          <WidgetCell id="steps" widgets={widgets} />
+          <WidgetCell id="load" widgets={widgets} />
+          <WidgetCell id="pulse" widgets={widgets} />
+        </div>
+        <WidgetCell id="twin" widgets={widgets} className="atlant-dash-twin" />
+      </div>
+    </section>
+  );
+}
+
+function SplitSection({
+  section,
+  widgets,
+}: {
+  section: DashboardSection;
+  widgets: Partial<Record<DashboardWidgetId, ReactNode>>;
+}) {
+  return (
+    <section>
+      <SectionHeader section={section} />
+      <div className="atlant-dash-split">
+        {section.widgets.map((id) => (
+          <WidgetCell key={id} id={id} widgets={widgets} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CardsSection({
+  section,
+  widgets,
+}: {
+  section: DashboardSection;
+  widgets: Partial<Record<DashboardWidgetId, ReactNode>>;
+}) {
+  return (
+    <section>
+      <SectionHeader section={section} />
+      <div className="atlant-dash-cards">
+        {section.widgets.map((id) => (
+          <WidgetCell key={id} id={id} widgets={widgets} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FullSection({
+  section,
+  widgets,
+}: {
+  section: DashboardSection;
+  widgets: Partial<Record<DashboardWidgetId, ReactNode>>;
+}) {
+  return (
+    <section>
+      <SectionHeader section={section} />
+      <div className="atlant-dash-full">
+        {section.widgets.map((id) => (
+          <WidgetCell key={id} id={id} widgets={widgets} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function renderSection(
+  section: DashboardSection,
+  widgets: Partial<Record<DashboardWidgetId, ReactNode>>
+) {
+  switch (section.layout) {
+    case "hero":
+      return <HeroSection key={section.id} section={section} widgets={widgets} />;
+    case "split":
+      return <SplitSection key={section.id} section={section} widgets={widgets} />;
+    case "cards":
+      return <CardsSection key={section.id} section={section} widgets={widgets} />;
+    case "full":
+      return <FullSection key={section.id} section={section} widgets={widgets} />;
+    default:
+      return null;
+  }
+}
+
 export default function DashboardDesktopGrid({
   widgets,
   showBodyTiles = true,
 }: DashboardDesktopGridProps) {
-  const { width, containerRef, mounted } = useContainerWidth();
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  const layout = useDashboardLayoutStore((s) => s.layout);
-  const visibleWidgets = useDashboardLayoutStore((s) => s.visibleWidgets);
-  const editMode = useDashboardLayoutStore((s) => s.editMode);
-  const setLayout = useDashboardLayoutStore((s) => s.setLayout);
-  const setEditMode = useDashboardLayoutStore((s) => s.setEditMode);
-  const addWidget = useDashboardLayoutStore((s) => s.addWidget);
-  const removeWidget = useDashboardLayoutStore((s) => s.removeWidget);
-  const resetLayout = useDashboardLayoutStore((s) => s.resetLayout);
-
-  const activeLayout = layoutForVisible(visibleWidgets, layout);
-
-  const onLayoutChange = useCallback(
-    (next: Layout) => {
-      if (!editMode) return;
-      setLayout([...next]);
-    },
-    [editMode, setLayout]
-  );
-
-  const hiddenWidgets = allWidgetIds().filter(
-    (id) =>
-      !visibleWidgets.includes(id) &&
-      (id !== "body-metrics" || showBodyTiles)
-  );
+  const sections = dashboardSections(showBodyTiles);
 
   return (
-    <div ref={containerRef} className="w-full">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-surface/70 px-4 py-3 backdrop-blur-md">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-            Рабочий стол · 12 колонок
-          </p>
-          <p className="text-xs text-muted">
-            {editMode
-              ? "Перетащите за ⠿ · тяните угол для размера"
-              : "Режим просмотра — включите редактирование для настройки"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {editMode && (
-            <>
-              <Button
-                size="md"
-                variant="secondary"
-                className="!w-auto"
-                onClick={() => setPickerOpen((v) => !v)}
-              >
-                {pickerOpen ? "Скрыть виджеты" : "+ Добавить"}
-              </Button>
-              <Button
-                size="md"
-                variant="ghost"
-                className="!w-auto"
-                onClick={() => {
-                  if (
-                    window.confirm("Сбросить расположение виджетов по умолчанию?")
-                  ) {
-                    resetLayout();
-                  }
-                }}
-              >
-                Сброс
-              </Button>
-            </>
-          )}
-          <Button
-            size="md"
-            className="!w-auto"
-            variant={editMode ? "primary" : "secondary"}
-            onClick={() => {
-              setEditMode(!editMode);
-              setPickerOpen(false);
-            }}
-          >
-            {editMode ? "Готово" : "Редактировать"}
-          </Button>
-        </div>
-      </div>
-
-      {editMode && pickerOpen && hiddenWidgets.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-muted)] p-3">
-          {hiddenWidgets.map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => addWidget(id)}
-              className="rounded-xl border border-[var(--primary)]/30 bg-surface px-3 py-2 text-xs font-medium text-primary shadow-sm hover:bg-[var(--primary-muted)]"
-            >
-              {WIDGET_META[id].icon} {WIDGET_META[id].title}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {editMode && pickerOpen && hiddenWidgets.length === 0 && (
-        <p className="mb-4 text-center text-xs text-muted">
-          Все доступные виджеты уже на панели
-        </p>
-      )}
-
-      {mounted && width > 0 && (
-        <GridLayout
-          className="dashboard-grid"
-          width={width}
-          layout={activeLayout}
-          cols={COLS}
-          rowHeight={ROW_HEIGHT}
-          margin={[12, 12] as const}
-          containerPadding={[0, 0] as const}
-          isDraggable={editMode}
-          isResizable={editMode}
-          draggableHandle=".dashboard-drag-handle"
-          resizeHandles={["se"]}
-          onLayoutChange={onLayoutChange}
-          compactType="vertical"
-          preventCollision={false}
-        >
-          {visibleWidgets.map((id) => (
-            <div
-              key={id}
-              className={`h-full ${id === "sport-picker" && editMode ? "pointer-events-auto" : ""}`}
-            >
-              <DashboardWidgetFrame
-                id={id}
-                editMode={editMode}
-                onRemove={removeWidget}
-              >
-                {widgets[id] ?? (
-                  <div className="flex h-full items-center justify-center text-xs text-muted">
-                    Нет данных
-                  </div>
-                )}
-              </DashboardWidgetFrame>
-            </div>
-          ))}
-        </GridLayout>
-      )}
+    <div className="flex flex-col gap-8">
+      {sections.map((section) => renderSection(section, widgets))}
     </div>
   );
 }

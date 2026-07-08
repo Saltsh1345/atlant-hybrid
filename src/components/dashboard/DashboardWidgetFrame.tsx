@@ -2,55 +2,36 @@
 
 import type { ReactNode } from "react";
 import type { DashboardWidgetId } from "@/lib/dashboard/widgets";
-import { PINNED_WIDGETS, WIDGET_META } from "@/lib/dashboard/widgets";
+import { WIDGET_META, WIDGETS_WITHOUT_HEADER } from "@/lib/dashboard/widgets";
+import AppIcon from "@/components/ui/AppIcon";
 
 export default function DashboardWidgetFrame({
   id,
-  editMode,
-  onRemove,
   children,
+  className = "",
 }: {
   id: DashboardWidgetId;
-  editMode: boolean;
-  onRemove: (id: DashboardWidgetId) => void;
   children: ReactNode;
+  className?: string;
 }) {
   const meta = WIDGET_META[id];
-  const pinned = PINNED_WIDGETS.includes(id);
+  const hideHeader = WIDGETS_WITHOUT_HEADER.includes(id);
 
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/90 shadow-sm backdrop-blur-sm ${
-        editMode
-          ? "ring-2 ring-[var(--primary)]/40 ring-offset-1 ring-offset-[var(--background)]"
-          : ""
-      }`}
+      className={`flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/90 shadow-sm backdrop-blur-sm ${className}`}
     >
-      {editMode && (
-        <div className="dashboard-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--primary-muted)] px-3 py-1.5 active:cursor-grabbing">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="text-[var(--muted)]" aria-hidden>
-              ⠿
+      {!hideHeader && (
+        <div className="shrink-0 border-b border-[var(--border)]/60 px-4 py-2.5">
+          <h3 className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            <span className="mr-1.5 inline-flex align-middle" aria-hidden>
+              <AppIcon name={meta.icon} className="h-3.5 w-3.5" />
             </span>
-            <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">
-              {meta.icon} {meta.title}
-            </span>
-          </div>
-          {!pinned && (
-            <button
-              type="button"
-              onClick={() => onRemove(id)}
-              className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-[var(--muted)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
-              title="Убрать виджет"
-            >
-              ✕
-            </button>
-          )}
+            {meta.title}
+          </h3>
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-auto p-1 [&_button]:pointer-events-auto">
-        {children}
-      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-3">{children}</div>
     </div>
   );
 }

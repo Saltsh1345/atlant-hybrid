@@ -9,7 +9,7 @@ import AutoFrameViewport from "@/components/camera/AutoFrameViewport";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import CountdownOverlay from "@/components/training/CountdownOverlay";
 import RestTimerOverlay from "@/components/training/RestTimerOverlay";
-import SportHUD from "@/components/hud/SportHUD";
+import WorkoutFocusHUD from "@/components/hud/WorkoutFocusHUD";
 import LiveScanGrid from "@/components/visual/LiveScanGrid";
 import BiomechTwinPanel from "@/components/visual/BiomechTwinPanel";
 import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
@@ -313,16 +313,14 @@ export default function TrainingScreen() {
           )}
 
           {trackingActive && (
-            <SportHUD
+            <WorkoutFocusHUD
               sport={selectedSport}
               kinematics={kinematics}
               exercise={selectedExercise}
               reps={reps}
               formScore={formScore}
               elapsedSec={elapsedSec}
-              coachText={isDrillSport ? undefined : coachText}
               strikeLabel={drill.command?.text}
-              strikeType={drill.command?.type}
               lastStrikeSpeed={lastStrikeSpeed}
               strikeFlash={strikeFlash}
             />
@@ -342,16 +340,6 @@ export default function TrainingScreen() {
             />
           )}
 
-          <div className="absolute top-3 left-3 z-20 flex gap-2">
-            <span className="rounded-full border border-[var(--primary)]/30 bg-surface/80 px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-primary shadow backdrop-blur-md">
-              {isDrillSport ? "Drill" : "VBT"} · {sportLabel}
-            </span>
-            {isDrillSport && drill.phase === "active" && (
-              <span className="rounded-full border border-[var(--readiness)]/40 bg-[var(--readiness-muted)] px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-readiness shadow backdrop-blur-md">
-                Запись
-              </span>
-            )}
-          </div>
         </div>
 
         <div className="flex gap-2 p-4 lg:hidden">
@@ -379,7 +367,7 @@ export default function TrainingScreen() {
       </div>
 
       {/* Правая часть: 3D-заглушка (heatmap emission) */}
-      <aside className="flex w-full flex-col gap-4 p-4 lg:w-[42%] lg:max-w-[480px] lg:p-6">
+      <aside className="hidden w-full flex-col gap-4 p-4 opacity-60 transition-opacity lg:flex lg:w-[42%] lg:max-w-[480px] lg:p-6 lg:opacity-40">
         <div className="hidden items-center justify-between lg:flex">
           <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-muted">
             Цифровой двойник

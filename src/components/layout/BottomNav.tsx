@@ -3,26 +3,28 @@
 import { useAppStore } from "@/store/useAppStore";
 import { useDashboardLayoutStore } from "@/store/useDashboardLayoutStore";
 import type { AppPhase } from "@/types";
+import AppIcon, { type AppIconName } from "@/components/ui/AppIcon";
 
 type NavItem = {
   id: string;
   phase: AppPhase;
   label: string;
-  icon: string;
+  icon: AppIconName;
   focusSport?: boolean;
 };
 
 const NAV: NavItem[] = [
-  { id: "home", phase: "welcome", label: "Главная", icon: "🏠" },
-  { id: "dash", phase: "dashboard", label: "Дашборд", icon: "📊" },
+  { id: "dash", phase: "dashboard", label: "Обзор", icon: "overview" },
   {
     id: "train",
     phase: "dashboard",
-    label: "Тренировка",
-    icon: "🏋️",
+    label: "Тренировки",
+    icon: "bolt",
     focusSport: true,
   },
-  { id: "settings", phase: "settings", label: "Настройки", icon: "⚙️" },
+  { id: "scan", phase: "calibration", label: "Скан", icon: "body" },
+  { id: "twin", phase: "twin-live", label: "Двойник", icon: "twin" },
+  { id: "settings", phase: "settings", label: "Настройки", icon: "settings" },
 ];
 
 const VISIBLE_ON: AppPhase[] = [
@@ -35,6 +37,8 @@ const VISIBLE_ON: AppPhase[] = [
 export default function BottomNav() {
   const phase = useAppStore((s) => s.phase);
   const setPhase = useAppStore((s) => s.setPhase);
+  const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
+  const requestRescan = useAppStore((s) => s.requestRescan);
   const setFocusSportPicker = useDashboardLayoutStore((s) => s.setFocusSportPicker);
 
   if (!VISIBLE_ON.includes(phase)) return null;
@@ -43,12 +47,25 @@ export default function BottomNav() {
     if (item.focusSport) {
       useAppStore.getState().ensureProfile();
       setFocusSportPicker(true);
-      setPhase("dashboard");
+      setPhase("sport-select");
       return;
     }
     setFocusSportPicker(false);
     if (item.phase === "settings") {
       useAppStore.getState().ensureProfile();
+    }
+    if (item.phase === "calibration") {
+      if (bodyDataLocked) requestRescan();
+      setPhase("calibration");
+      return;
+    }
+    if (item.phase === "twin-live") {
+      if (!bodyDataLocked) {
+        setPhase("calibration");
+        return;
+      }
+      setPhase("twin-live");
+      return;
     }
     setPhase(item.phase);
   };
@@ -74,7 +91,9 @@ export default function BottomNav() {
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              <span className="text-lg">{item.icon}</span>
+              <span className="text-lg">
+                <AppIcon name={item.icon} className="h-5 w-5" />
+              </span>
               {item.label}
             </button>
           );

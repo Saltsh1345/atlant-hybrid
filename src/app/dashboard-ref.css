@@ -8,98 +8,94 @@
     color var(--duration-normal) var(--ease-out);
 }
 
-.dashboard-ref-grid {
+/* Fixed desktop layout — no drag-and-drop */
+.atlant-dash-hero {
   display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(220px, 280px);
+  grid-template-rows: minmax(200px, 1fr) auto;
   gap: 14px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.72fr) minmax(
-      0,
-      0.72fr
-    )
-    minmax(240px, 26%);
-  grid-template-rows: 200px 148px 148px 168px;
+  min-height: 380px;
 }
 
-.dashboard-ref-activity {
-  grid-column: 1 / span 2;
-  grid-row: 1 / span 2;
-}
-
-.dashboard-ref-steps {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.dashboard-ref-load {
-  grid-column: 4;
-  grid-row: 1;
-}
-
-.dashboard-ref-pulse {
-  grid-column: 3 / span 2;
-  grid-row: 2;
-}
-
-.dashboard-ref-water {
+.atlant-dash-sport {
   grid-column: 1;
-  grid-row: 3;
+  grid-row: 1 / -1;
 }
 
-.dashboard-ref-sleep {
+.atlant-dash-rings {
   grid-column: 2;
-  grid-row: 3;
+  grid-row: 1;
+  min-height: 200px;
 }
 
-.dashboard-ref-macros {
-  grid-column: 3 / span 2;
-  grid-row: 3;
+.atlant-dash-metrics {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-height: 110px;
 }
 
-.dashboard-ref-run {
-  grid-column: 1;
-  grid-row: 4;
+.atlant-dash-twin {
+  grid-column: 3;
+  grid-row: 1 / -1;
+  min-height: 320px;
 }
 
-.dashboard-ref-plan {
-  grid-column: 2 / span 2;
-  grid-row: 4;
+.atlant-dash-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 14px;
+  min-height: 200px;
 }
 
-.dashboard-ref-twin {
-  grid-column: 5;
-  grid-row: 1 / span 4;
-  min-width: 0;
+.atlant-dash-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
-@media (min-width: 1536px) {
-  .dashboard-ref-grid {
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(
-        0,
-        0.8fr
-      );
-    grid-template-rows: 210px 155px 155px 175px;
-  }
+.atlant-dash-full {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
 }
 
 @media (max-width: 1279px) {
-  .dashboard-ref-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto;
+  .atlant-dash-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    min-height: unset;
   }
-  .dashboard-ref-activity,
-  .dashboard-ref-steps,
-  .dashboard-ref-load,
-  .dashboard-ref-pulse,
-  .dashboard-ref-water,
-  .dashboard-ref-sleep,
-  .dashboard-ref-macros,
-  .dashboard-ref-run,
-  .dashboard-ref-plan,
-  .dashboard-ref-twin {
-    grid-column: auto;
-    grid-row: auto;
+
+  .atlant-dash-sport {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 240px;
   }
-  .dashboard-ref-twin {
-    min-height: 320px;
+
+  .atlant-dash-rings {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .atlant-dash-metrics {
+    grid-column: 2;
+    grid-row: 2;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(3, auto);
+  }
+
+  .atlant-dash-twin {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-height: 300px;
+  }
+
+  .atlant-dash-split,
+  .atlant-dash-cards {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -1,15 +1,13 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import Button from "@/components/ui/Button";
 import { renderDashboardWidget } from "@/components/dashboard/DashboardWidgetViews";
 import DashboardWidgetFrame from "@/components/dashboard/DashboardWidgetFrame";
 import {
   allWidgetIds,
-  WIDGET_META,
+  dashboardSections,
   type DashboardWidgetId,
 } from "@/lib/dashboard/widgets";
-import { useDashboardLayoutStore } from "@/store/useDashboardLayoutStore";
 import type { ReadinessReport } from "@/lib/readiness";
 import type { WorkoutPlan } from "@/lib/ai/workoutPlan";
 import type {
@@ -54,34 +52,19 @@ export function buildDashboardWidgets(
   return widgets;
 }
 
-function MobileEditBar() {
-  const editMode = useDashboardLayoutStore((s) => s.editMode);
-  const setEditMode = useDashboardLayoutStore((s) => s.setEditMode);
-  const resetLayout = useDashboardLayoutStore((s) => s.resetLayout);
-
+function MobileWidget({
+  id,
+  children,
+  minH,
+}: {
+  id: DashboardWidgetId;
+  children: ReactNode;
+  minH?: string;
+}) {
   return (
-    <div className="mb-4 flex flex-wrap gap-2">
-      <Button
-        size="md"
-        variant={editMode ? "primary" : "secondary"}
-        className="!w-auto"
-        onClick={() => setEditMode(!editMode)}
-      >
-        {editMode ? "Готово" : "Настроить виджеты"}
-      </Button>
-      {editMode && (
-        <Button
-          size="md"
-          variant="ghost"
-          className="!w-auto"
-          onClick={() => {
-            if (window.confirm("Сбросить виджеты по умолчанию?")) resetLayout();
-          }}
-        >
-          Сброс
-        </Button>
-      )}
-    </div>
+    <DashboardWidgetFrame id={id}>
+      <div className={minH ?? "min-h-[120px]"}>{children}</div>
+    </DashboardWidgetFrame>
   );
 }
 
@@ -92,53 +75,38 @@ export function DashboardMobileModular({
   ctx: DashboardWidgetContext;
   highlightSport?: boolean;
 }) {
-  const visibleWidgets = useDashboardLayoutStore((s) => s.visibleWidgets);
-  const editMode = useDashboardLayoutStore((s) => s.editMode);
-  const removeWidget = useDashboardLayoutStore((s) => s.removeWidget);
-  const addWidget = useDashboardLayoutStore((s) => s.addWidget);
-
   const widgets = useMemo(
     () => buildDashboardWidgets(ctx, { highlightSport }),
     [ctx, highlightSport]
   );
 
-  const hidden = allWidgetIds().filter(
-    (id) =>
-      !visibleWidgets.includes(id) &&
-      (id !== "body-metrics" || ctx.showBodyTiles)
-  );
+  const sections = dashboardSections(ctx.showBodyTiles);
 
   return (
-    <>
-      <MobileEditBar />
-      {editMode && hidden.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-muted)] p-3">
-          {hidden.map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => addWidget(id)}
-              className="rounded-lg border border-[var(--primary)]/30 bg-surface px-2 py-1.5 text-xs text-primary"
-            >
-              + {WIDGET_META[id].icon} {WIDGET_META[id].title}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="flex flex-col gap-4">
-        {visibleWidgets.map((id) => (
-          <DashboardWidgetFrame
-            key={id}
-            id={id}
-            editMode={editMode}
-            onRemove={removeWidget}
-          >
-            <div className={id === "sport-picker" ? "min-h-[200px]" : "min-h-[120px]"}>
-              {widgets[id]}
-            </div>
-          </DashboardWidgetFrame>
-        ))}
-      </div>
-    </>
+    <div className="flex flex-col gap-6">
+      {sections.map((section) => (
+        <section key={section.id}>
+          <header className="mb-3">
+            <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
+              {section.title}
+            </h2>
+            {section.subtitle && (
+              <p className="mt-0.5 text-xs text-muted">{section.subtitle}</p>
+            )}
+          </header>
+          <div className="flex flex-col gap-3">
+            {section.widgets.map((id) => (
+              <MobileWidget
+                key={id}
+                id={id}
+                minH={id === "sport-picker" ? "min-h-[200px]" : undefined}
+              >
+                {widgets[id]}
+              </MobileWidget>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }

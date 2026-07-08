@@ -13,6 +13,7 @@ interface DigitalTwinCardProps {
   onOpenLive?: () => void;
   className?: string;
   lastSession?: SessionSummary | null;
+  calm?: boolean;
 }
 
 export default function DigitalTwinCard({
@@ -22,6 +23,7 @@ export default function DigitalTwinCard({
   onOpenLive,
   className = "",
   lastSession = null,
+  calm = false,
 }: DigitalTwinCardProps) {
   const { asset, available, ready } = useAvatarAsset();
   const [showTwin, setShowTwin] = useState(false);
@@ -47,13 +49,15 @@ export default function DigitalTwinCard({
               {asset && ` · ${asset.format.toUpperCase()}`}]
             </p>
           ) : (
-            <p className="mt-0.5 text-[10px] text-warning">
-              {!ready
-                ? "Загрузка mesh-модели…"
-                : !available
-                  ? "Добавьте avatar.glb в public/"
+          <p className="mt-0.5 text-[10px] text-[#a3a3a3]">
+            {!ready
+              ? "Загрузка mesh-модели…"
+              : !available
+                ? "Добавьте avatar.glb в public/"
+                : calm
+                  ? "Голограмма · мышцы и жир активны"
                   : "Пройдите скан для фиксации состава"}
-            </p>
+          </p>
           )}
         </div>
         {locked && onOpenLive && (
@@ -81,6 +85,7 @@ export default function DigitalTwinCard({
             lastSession={lastSession}
             tall
             showHud
+            calm={calm}
             className="h-full min-h-[220px]"
           />
         </div>

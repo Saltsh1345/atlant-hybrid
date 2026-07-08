@@ -25,7 +25,7 @@ export function applyThemeToDom(resolved: "light" | "dark") {
   if (meta) {
     meta.setAttribute(
       "content",
-      resolved === "dark" ? "#0b1220" : "#f8fafc"
+      resolved === "dark" ? "#000000" : "#f8fafc"
     );
   }
 }

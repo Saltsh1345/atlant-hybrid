@@ -4,7 +4,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-/** Static floor grid under the avatar — tuned for dark viewport. */
+/** Floor under hologram twin — dark + thin cyan ring like reference */
 export default function AvatarFloorGrid({
   pulse = false,
 }: {
@@ -14,50 +14,52 @@ export default function AvatarFloorGrid({
   const matRef = useRef<THREE.MeshBasicMaterial>(null);
 
   const grid = useMemo(() => {
-    const size = 4.2;
-    const divisions = 18;
-    const g = new THREE.GridHelper(size, divisions, 0x22d3ee, 0x1e3a5f);
+    const size = 3.6;
+    const divisions = 28;
+    const g = new THREE.GridHelper(size, divisions, 0x38bdf8, 0x082f49);
     g.position.y = 0.001;
     const mats = g.material;
     if (Array.isArray(mats)) {
       mats.forEach((m) => {
         m.transparent = true;
-        m.opacity = 0.55;
+        m.opacity = 0.35;
         m.depthWrite = false;
       });
     } else {
       mats.transparent = true;
-      mats.opacity = 0.55;
+      mats.opacity = 0.35;
       mats.depthWrite = false;
     }
     return g;
   }, []);
 
   useFrame(({ clock }) => {
-    if (!pulse || !matRef.current) return;
+    if (!matRef.current) return;
     const t = clock.getElapsedTime();
-    matRef.current.opacity = 0.1 + Math.sin(t * 1.4) * 0.05;
+    matRef.current.opacity = pulse
+      ? 0.08 + Math.sin(t * 1.2) * 0.04
+      : 0.07 + Math.sin(t * 0.7) * 0.02;
   });
 
   return (
-    <group position={[0, 0, 0]}>
+    <group>
       <primitive object={grid} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <circleGeometry args={[1.8, 48]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]}>
+        <circleGeometry args={[1.15, 64]} />
         <meshBasicMaterial
           ref={matRef}
-          color="#0ea5e9"
+          color="#0284c7"
           transparent
-          opacity={0.12}
+          opacity={0.08}
           depthWrite={false}
         />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
-        <ringGeometry args={[1.75, 1.82, 64]} />
+        <ringGeometry args={[1.12, 1.16, 96]} />
         <meshBasicMaterial
-          color="#22d3ee"
+          color="#67e8f9"
           transparent
-          opacity={0.65}
+          opacity={0.75}
           side={THREE.DoubleSide}
           depthWrite={false}
         />

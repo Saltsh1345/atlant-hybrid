@@ -10,7 +10,9 @@ import {
   Tooltip,
   XAxis,
 } from "recharts";
+import ActivityRings from "@/components/ui/ActivityRings";
 import Button from "@/components/ui/Button";
+import { computeActivityRings } from "@/lib/activity/rings";
 import Card from "@/components/ui/Card";
 import DashboardSportPicker from "@/components/dashboard/DashboardSportPicker";
 import DigitalTwinCard from "@/components/dashboard/DigitalTwinCard";
@@ -150,6 +152,20 @@ export function renderDashboardWidget(
   const waterBars = [0.25, 0.4, 0.55, 0.7, 0.85, 0.65, 0.9, hydrationPct / 100];
 
   switch (id) {
+    case "rings": {
+      const data = computeActivityRings(
+        ctx.sessionHistory,
+        ctx.profile?.weight ?? 75
+      );
+      return (
+        <ActivityRings
+          rings={data.rings}
+          periodLabel={data.periodLabel}
+          className="h-full !border-0 !shadow-none"
+        />
+      );
+    }
+
     case "sport-picker":
       return <DashboardSportPicker highlight={extras.highlightSport} />;
 

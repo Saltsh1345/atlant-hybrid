@@ -44,37 +44,44 @@
 }
 
 [data-theme="dark"] {
-  --background: #0b1220;
-  --background-secondary: #0f172a;
-  --foreground: #f1f5f9;
-  --foreground-secondary: #94a3b8;
-  --surface: #131c2e;
-  --surface-elevated: #1a2438;
-  --border: #1e293b;
-  --border-subtle: rgba(148, 163, 184, 0.1);
-  --muted: #94a3b8;
-  --primary: #38bdf8;
-  --primary-hover: #0ea5e9;
-  --primary-muted: rgba(56, 189, 248, 0.14);
-  --accent: #34d399;
-  --accent-muted: rgba(52, 211, 153, 0.14);
-  --success: #4ade80;
-  --warning: #fbbf24;
+  --background: #000000;
+  --background-secondary: #0a0a0a;
+  --foreground: #f5f5f5;
+  --foreground-secondary: #a3a3a3;
+  --surface: #141414;
+  --surface-elevated: #1c1c1c;
+  --border: #262626;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --muted: #737373;
+  /* APEXFORM neon lime */
+  --neon-lime: #ccff00;
+  --neon-cyan: #00d4ff;
+  --neon-orange: #ff6b2c;
+  --muscle-push: #a78bfa;
+  --muscle-pull: #f472b6;
+  --muscle-core: #2dd4bf;
+  --primary: #ccff00;
+  --primary-hover: #d9ff33;
+  --primary-muted: rgba(204, 255, 0, 0.12);
+  --accent: #ccff00;
+  --accent-muted: rgba(204, 255, 0, 0.12);
+  --success: #ccff00;
+  --warning: #f59e0b;
   --danger: #f87171;
-  --readiness: #fb923c;
-  --readiness-muted: rgba(251, 146, 60, 0.14);
+  --readiness: #ccff00;
+  --readiness-muted: rgba(204, 255, 0, 0.14);
   --fat: #fcd34d;
-  --muscle: #4ade80;
-  --muscle-light: #86efac;
-  --technique-ok: #34d399;
+  --muscle: #ccff00;
+  --muscle-light: #e8ff80;
+  --technique-ok: #ccff00;
   --technique-critical: #f87171;
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
-  --dash-bg: #0b1220;
-  --dash-card: #131c2e;
-  --dash-sidebar: #0f172a;
-  --dash-text: #f1f5f9;
-  --dash-muted: #94a3b8;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --dash-bg: #000000;
+  --dash-card: #141414;
+  --dash-sidebar: #0a0a0a;
+  --dash-text: #f5f5f5;
+  --dash-muted: #737373;
 }
 
 @theme inline {
@@ -194,13 +201,56 @@ body {
 }
 
 .atlant-btn-primary {
-  background: var(--primary);
-  color: #fff;
-  box-shadow: 0 4px 16px var(--primary-muted);
+  background: var(--neon-cyan, var(--primary));
+  color: #0a0a0a;
+  font-weight: 600;
+  box-shadow:
+    0 0 20px rgba(0, 212, 255, 0.35),
+    0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .atlant-btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
+  box-shadow:
+    0 0 28px rgba(0, 212, 255, 0.5),
+    0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Sport-scale typography */
+.text-metric-xl {
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-metric-lg {
+  font-size: clamp(1.75rem, 5vw, 3rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Workout Focus Mode */
+.focus-hud-bar {
+  background: linear-gradient(
+    to top,
+    rgba(18, 18, 18, 0.98) 0%,
+    rgba(18, 18, 18, 0.85) 60%,
+    transparent 100%
+  );
+}
+
+.focus-hud-glow-cyan {
+  text-shadow: 0 0 24px rgba(0, 212, 255, 0.6);
+  color: var(--neon-cyan, var(--primary));
+}
+
+.focus-hud-glow-orange {
+  text-shadow: 0 0 24px rgba(255, 107, 44, 0.6);
+  color: var(--neon-orange, var(--accent));
 }
 
 .atlant-btn-secondary {
@@ -299,16 +349,32 @@ body {
 }
 
 .atlant-twin-panel {
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  box-shadow:
+    0 8px 40px rgba(2, 6, 23, 0.55),
+    0 0 60px rgba(34, 211, 238, 0.08),
+    inset 0 1px 0 rgba(34, 211, 238, 0.1);
+}
+
+.atlant-twin-panel--calm {
   border: 1px solid rgba(34, 211, 238, 0.22);
   box-shadow:
-    0 8px 40px rgba(2, 6, 23, 0.45),
-    inset 0 1px 0 rgba(34, 211, 238, 0.08);
+    0 8px 36px rgba(0, 0, 0, 0.45),
+    0 0 50px rgba(34, 211, 238, 0.07);
 }
 
 .atlant-twin-bg {
   background:
-    radial-gradient(ellipse 80% 55% at 50% 100%, rgba(14, 165, 233, 0.14), transparent),
-    linear-gradient(180deg, #020617 0%, #0b1220 55%, #0f172a 100%);
+    radial-gradient(ellipse 70% 55% at 50% 85%, rgba(14, 165, 233, 0.18), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 20%, rgba(56, 189, 248, 0.06), transparent),
+    linear-gradient(180deg, #020617 0%, #030712 50%, #0b1220 100%);
+}
+
+.atlant-twin-bg-calm {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 85%, rgba(14, 165, 233, 0.16), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 15%, rgba(125, 211, 252, 0.05), transparent),
+    linear-gradient(180deg, #000000 0%, #020617 55%, #0a1220 100%);
 }
 
 .atlant-hud-pill {
@@ -328,6 +394,12 @@ body {
   z-index: 5;
 }
 
+.atlant-hud-pill--calm {
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(2, 6, 23, 0.75);
+  color: #7dd3fc;
+}
+
 .atlant-hud-tag {
   font-family: ui-monospace, monospace;
   font-size: 0.6rem;
@@ -338,6 +410,16 @@ body {
   border-radius: 0.35rem;
   padding: 0.2rem 0.45rem;
   z-index: 5;
+}
+
+.atlant-hud-tag--calm {
+  color: #bae6fd;
+  background: rgba(2, 6, 23, 0.72);
+  border-color: rgba(34, 211, 238, 0.3);
+  letter-spacing: 0.04em;
+  font-family: ui-monospace, monospace;
+  font-size: 0.65rem;
+  text-transform: none;
 }
 
 .atlant-edge-hud {
@@ -393,34 +475,6 @@ body {
 
 .strike-vignette-tennis {
   animation: strike-vignette-tennis 0.55s ease-out forwards;
-}
-
-/* Dashboard grid */
-.dashboard-grid .react-grid-item {
-  transition: box-shadow var(--duration-normal) var(--ease-out);
-}
-
-.dashboard-grid .react-grid-item.react-draggable-dragging {
-  z-index: 30;
-  box-shadow: 0 12px 40px var(--primary-muted);
-}
-
-.dashboard-grid .react-resizable-handle-se {
-  right: 4px;
-  bottom: 4px;
-  width: 14px;
-  height: 14px;
-  border-right: 2px solid var(--primary);
-  border-bottom: 2px solid var(--primary);
-  border-radius: 0 0 4px 0;
-  opacity: 0.55;
-}
-
-.dashboard-grid .react-grid-placeholder {
-  background: var(--primary-muted) !important;
-  border: 1px dashed var(--primary) !important;
-  border-radius: var(--radius);
-  opacity: 0.85 !important;
 }
 
 .dashboard-pro-grid {
