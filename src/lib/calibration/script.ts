@@ -122,14 +122,25 @@ export const PHONE_CALIBRATION_SCRIPT: ScriptLine[] = [
   },
 ];
 
-export function getCalibrationScript(kind?: DeviceKind): ScriptLine[] {
+export function getCalibrationScript(
+  kind?: DeviceKind,
+  phoneMode?: "selfie" | "tripod"
+): ScriptLine[] {
   if (kind === "phone" || kind === "tablet") {
+    if (phoneMode === "selfie") {
+      return LAPTOP_CALIBRATION_SCRIPT;
+    }
     return PHONE_CALIBRATION_SCRIPT;
   }
   if (kind === "laptop") {
     return LAPTOP_CALIBRATION_SCRIPT;
   }
-  return isMobileDevice() ? PHONE_CALIBRATION_SCRIPT : LAPTOP_CALIBRATION_SCRIPT;
+  if (isMobileDevice()) {
+    return phoneMode === "selfie"
+      ? LAPTOP_CALIBRATION_SCRIPT
+      : PHONE_CALIBRATION_SCRIPT;
+  }
+  return LAPTOP_CALIBRATION_SCRIPT;
 }
 
 /** @deprecated use getCalibrationScript */

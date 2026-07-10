@@ -52,7 +52,12 @@ import {
   listCapturedViews,
   type ScanKeyframes,
 } from "@/lib/bio/captureScanFrame";
-import { speakScript, speakGuidance, stopSpeaking } from "@/lib/ai/speech";
+import PhoneScanPreflight, {
+  type PhoneScanMode,
+} from "@/components/calibration/PhoneScanPreflight";
+import PhoneVoiceScanOverlay from "@/components/calibration/PhoneVoiceScanOverlay";
+import { countdownBeeps, scanBeep } from "@/lib/camera/scanBeeps";
+import { speakScript, speakGuidance, speakLongText, stopSpeaking } from "@/lib/ai/speech";
 import { estimateDistanceMeters } from "@/lib/camera/distanceEstimator";
 import { estimateHeightFromPose } from "@/lib/camera/heightEstimator";
 import { resetDistanceSmoother } from "@/lib/camera/distanceSmoother";
@@ -81,13 +86,16 @@ export default function CalibrationScreen() {
   const [scanSampleCount, setScanSampleCount] = useState(0);
   const clothingHitsRef = useRef(0);
   const clothingChecksRef = useRef(0);
-  const [cameraFacing, setCameraFacing] = useState<CameraFacing>(() =>
-    isMobileDevice()
-      ? detectMobileCameraCapabilities().scanFacing
-      : "user"
-  );
+  const [cameraFacing, setCameraFacing] = useState<CameraFacing>("user");
   const deviceKind = detectDeviceKind();
   const mobileCaps = detectMobileCameraCapabilities();
+  const isPhone = isMobileDevice();
+  const [phoneScanMode, setPhoneScanMode] = useState<PhoneScanMode | null>(
+    isPhone ? null : "selfie"
+  );
+  const [tripodReady, setTripodReady] = useState(false);
+  const [scanStepIndex, setScanStepIndex] = useState(0);
+  const [scanStepTotal, setScanStepTotal] = useState(0);
   const [setupDone, setSetupDone] = useState(false);
   const scanAutoStartedRef = useRef(false);
   const scanningActiveRef = useRef(false);
@@ -122,6 +130,8 @@ export default function CalibrationScreen() {
     ensureCameraCalibration();
     resetDistanceSmoother();
     setSetupDone(false);
+    setPhoneScanMode(isPhone ? null : "selfie");
+    setTripodReady(false);
     scanAutoStartedRef.current = false;
     const pending = useAppStore.getState().rescanPending;
     if (pending) {
@@ -193,11 +203,16 @@ export default function CalibrationScreen() {
         }
       },
       (feedback) => {
-        speakGuidance(`cal:pose:${step}`, feedback, { cooldownMs: 12000 });
+        const cooldown =
+          phoneScanMode === "tripod" && cameraFacing === "environment"
+            ? 6000
+            : 12000;
+        speakGuidance(`cal:pose:${step}`, feedback, { cooldownMs: cooldown });
       }
     );
     setPoseOk(true);
     captureKeyframe(step);
+    if (phoneScanMode === "tripod") scanBeep("ok");
   };
 
   const sampleForDuration = async (step: CalibrationStep, ms: number) => {
@@ -395,16 +410,25 @@ export default function CalibrationScreen() {
     setLiveClothing("");
     setScanSampleCount(0);
 
-    const script = getCalibrationScript(deviceKind);
+    const script = getCalibrationScript(deviceKind, phoneScanMode ?? "selfie");
+    setScanStepTotal(script.length);
+    const voiceOnly =
+      phoneScanMode === "tripod" && cameraFacing === "environment";
 
-    for (const line of script) {
+    for (let si = 0; si < script.length; si++) {
+      const line = script[si]!;
+      setScanStepIndex(si);
       setStepLocal(line.step);
       setCalibrationStep(line.step);
       setGuideHint(line.poseGuide ? poseGuideHint(line.step) : "");
       setPoseOk(false);
       setScriptText(line.text);
 
-      await speakAsync(line.text);
+      const announce = voiceOnly
+        ? `Шаг ${si + 1} из ${script.length}. ${line.text}`
+        : line.text;
+      if (voiceOnly) scanBeep("tick");
+      await speakAsync(announce);
 
       if (line.step === "analyzing") {
         setAnalyzing(true);
@@ -461,13 +485,32 @@ export default function CalibrationScreen() {
     latchBodyData,
     latchBodyResult,
     setCalibrationStep,
-    ensureProfile,
-    profile,
+    phoneScanMode,
+    cameraFacing,
+    deviceKind,
   ]);
 
   const scanning = running && !showComposition;
+  const voiceOnlyScan =
+    isPhone && phoneScanMode === "tripod" && cameraFacing === "environment";
   const ready = cameraStatus === "ready" && poseReady && !poseError;
-  const showSetup = ready && !setupDone && !running && !showComposition;
+  const showPreflight =
+    isPhone && phoneScanMode === null && !running && !showComposition;
+  const showTripodPosition =
+    isPhone &&
+    phoneScanMode === "tripod" &&
+    !tripodReady &&
+    !running &&
+    !showComposition &&
+    ready;
+  const showSetup =
+    ready &&
+    !setupDone &&
+    !running &&
+    !showComposition &&
+    !showPreflight &&
+    !showTripodPosition &&
+    (phoneScanMode === "selfie" || !isPhone);
 
   const finishSetup = useCallback(() => setSetupDone(true), []);
 
@@ -501,12 +544,27 @@ export default function CalibrationScreen() {
     if (!setupDone || running || showComposition || scanAutoStartedRef.current) {
       return;
     }
+    if (isPhone) return;
     scanAutoStartedRef.current = true;
     const t = window.setTimeout(() => {
       void runScript();
     }, 350);
     return () => window.clearTimeout(t);
-  }, [setupDone, running, showComposition, runScript]);
+  }, [setupDone, running, showComposition, runScript, isPhone]);
+
+  const startTripodScan = useCallback(async () => {
+    setCameraFacing("environment");
+    speakLongText(
+      "Включаю заднюю камеру. Не трогайте телефон. Десять секунд — отойдите на два метра, полный рост в кадре."
+    );
+    await new Promise((r) => setTimeout(r, 1500));
+    await countdownBeeps(10);
+    setTripodReady(true);
+    setSetupDone(true);
+    scanBeep("start");
+    await speakAsync("Скан начался. Слушайте голос — экран можно не смотреть.");
+    void runScript();
+  }, [runScript]);
 
   const coachContext: CoachContext | null = scanning
     ? {
@@ -527,8 +585,10 @@ export default function CalibrationScreen() {
           coachActive={cameraStatus === "ready" && poseReady && scanning}
           voiceCoach={
             scanning &&
-            (calibrationStep === "upper_body" ||
+            (voiceOnlyScan ||
+              calibrationStep === "upper_body" ||
               calibrationStep === "arms_up" ||
+              calibrationStep === "scan_start" ||
               calibrationStep === "turn_left" ||
               calibrationStep === "turn_right" ||
               calibrationStep === "center")
@@ -549,7 +609,49 @@ export default function CalibrationScreen() {
               <div className="scan-sweep" />
             </div>
           )}
+          {voiceOnlyScan && scanning && (
+            <PhoneVoiceScanOverlay
+              step={calibrationStep}
+              stepIndex={scanStepIndex}
+              stepTotal={scanStepTotal}
+              instruction={scriptText}
+              status={scanStatus}
+              voiceOnly
+            />
+          )}
         </CoachCameraViewport>
+      )}
+
+      {showPreflight && (
+        <PhoneScanPreflight
+          onSelect={(mode) => {
+            setPhoneScanMode(mode);
+            setCameraFacing("user");
+            setSetupDone(false);
+            setTripodReady(false);
+          }}
+          onCancel={() => setPhase("dashboard")}
+        />
+      )}
+
+      {showTripodPosition && (
+        <div className="absolute inset-0 z-50 flex flex-col justify-end bg-slate-950/90 px-5 pb-8 pt-12">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">
+            Подставка · шаг 1
+          </p>
+          <h2 className="mt-2 text-xl font-bold text-white">
+            Поставьте телефон, потом отойдите
+          </h2>
+          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-slate-200">
+            <li>Телефон вертикально на уровне груди (книги / подставка)</li>
+            <li>Нажмите кнопку — задняя камера и отсчёт 10 секунд</li>
+            <li>Отойдите на ~2 м — услышите бипы</li>
+            <li>Скан начнётся сам, шаги озвучиваются голосом</li>
+          </ol>
+          <Button size="lg" className="mt-6" onClick={() => void startTripodScan()}>
+            Задняя камера → отойду на 2 м
+          </Button>
+        </div>
       )}
 
       {showSetup && (
@@ -812,14 +914,23 @@ export default function CalibrationScreen() {
         )}
 
         <div className="space-y-2">
-          {!running && !showComposition && !setupDone && ready && (
+          {!running && !showComposition && showPreflight && (
             <p className="text-center text-xs text-cyan-300/90">
-              Впишитесь в силуэт — биоскан запустится автоматически
+              Выберите режим сканирования выше
+            </p>
+          )}
+          {!running && !showComposition && showSetup && !setupDone && (
+            <p className="text-center text-xs text-cyan-300/90">
+              {phoneScanMode === "selfie"
+                ? "Впишитесь в силуэт — видите экран, затем нажмите «Начать»"
+                : "Впишитесь в силуэт — биоскан запустится автоматически"}
             </p>
           )}
           {!running && !showComposition && setupDone && (
             <Button size="lg" onClick={runScript} disabled={running}>
-              Запустить биосканирование
+              {voiceOnlyScan || phoneScanMode === "tripod"
+                ? "Начать биоскан (голосовой)"
+                : "Запустить биосканирование"}
             </Button>
           )}
           {showComposition && (
