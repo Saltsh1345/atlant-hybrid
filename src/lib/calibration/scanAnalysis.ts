@@ -162,6 +162,10 @@ export function analyzeScanFrame(
   let clothingLikely = false;
   const reasons: string[] = [];
 
+  const le = landmarks[LM.L_ELBOW];
+  const re = landmarks[LM.R_ELBOW];
+  const elbowVis = (vis(le) + vis(re)) / 2;
+
   if (shoulders > 0.55 && wrists < 0.45) {
     clothingLikely = true;
     reasons.push("руки закрыты");
@@ -174,9 +178,21 @@ export function analyzeScanFrame(
     clothingLikely = true;
     reasons.push("широкий силуэт (вероятна верхняя одежда)");
   }
-  if (torsoH > 0 && shoulderW / torsoH > 0.72) {
+  if (torsoH > 0 && shoulderW / torsoH > 0.58) {
     clothingLikely = true;
-    reasons.push("объёмный торс");
+    reasons.push("объёмный торс (футболка)");
+  }
+  if (shoulderW > 0.24 && shoulders > 0.45) {
+    clothingLikely = true;
+    reasons.push("свободная верхняя одежда");
+  }
+  if (shoulders > 0.48 && elbowVis < shoulders - 0.1) {
+    clothingLikely = true;
+    reasons.push("рукава");
+  }
+  if (hipW > 0.01 && shoulderW / hipW < 0.9) {
+    clothingLikely = true;
+    reasons.push("расширенный торс");
   }
 
   const clothingReason = clothingLikely

@@ -2,6 +2,7 @@
 
 import Card from "@/components/ui/Card";
 import { formScoreLabel } from "@/lib/pose/formScore";
+import { eliteScoreLabel } from "@/lib/elite";
 import { exerciseLabel } from "@/lib/pose/exercises";
 import type { Sport, StrengthExercise } from "@/types";
 
@@ -20,6 +21,7 @@ interface SessionStatsProps {
   avgVelocity: number;
   peakVelocity: number;
   formScore: number;
+  eliteScore?: number;
   fatigue: number;
   reps?: number;
   punches?: number;
@@ -33,6 +35,7 @@ export default function SessionStats({
   avgVelocity,
   peakVelocity,
   formScore,
+  eliteScore = 0,
   fatigue,
   reps,
   punches,
@@ -47,18 +50,37 @@ export default function SessionStats({
       value: `${mins}:${secs.toString().padStart(2, "0")}`,
       color: "text-foreground",
     },
-    {
-      label: "Техника",
-      value: `${formScore}`,
+  ];
+
+  if (eliteScore > 0) {
+    items.push({
+      label: "Эталон",
+      value: `${eliteScore}`,
       unit: "%",
-      sub: formScoreLabel(formScore),
+      sub: eliteScoreLabel(eliteScore),
       color:
-        formScore >= 85
+        eliteScore >= 85
           ? "text-success"
-          : formScore >= 70
+          : eliteScore >= 70
             ? "text-primary"
             : "text-warning",
-    },
+    });
+  }
+
+  items.push({
+    label: "Техника",
+    value: `${formScore}`,
+    unit: "%",
+    sub: formScoreLabel(formScore),
+    color:
+      formScore >= 85
+        ? "text-success"
+        : formScore >= 70
+          ? "text-primary"
+          : "text-warning",
+  });
+
+  items.push(
     {
       label: "Ø Скорость",
       value: `${avgVelocity}`,
@@ -76,8 +98,8 @@ export default function SessionStats({
       value: `${fatigue}`,
       unit: "%",
       color: "text-warning",
-    },
-  ];
+    }
+  );
 
   if (reps != null && reps > 0) {
     items.push({ label: "Повторы", value: `${reps}`, color: "text-success" });

@@ -70,18 +70,18 @@ export function updateBenchReps(elbowAngle: number): number {
   return squatState.reps;
 }
 
-/** Drill strike — lower threshold than free sparring */
+/** Drill strike — requires real extension + speed (not arm waving) */
 export function detectDrillStrike(
   punchSpeedMs: number | null,
   wristVelocityMs: number,
   elbowAngle: number
 ): number | null {
   const speed =
-    punchSpeedMs ?? (wristVelocityMs > 1.4 ? wristVelocityMs : null);
-  if (!speed || speed < 1.4) return null;
-  if (elbowAngle < 100) return null;
+    punchSpeedMs ?? (wristVelocityMs > 2.1 ? wristVelocityMs : null);
+  if (!speed || speed < 2.1) return null;
+  if (elbowAngle < 115) return null;
   const now = Date.now();
-  if (now - punchState.lastAt < 350) return null;
+  if (now - punchState.lastAt < 500) return null;
   punchState.lastAt = now;
   return Math.round(speed * 100) / 100;
 }
@@ -100,17 +100,17 @@ export function updatePunchCount(
   return punchState.count;
 }
 
-/** Tennis drill swing — relaxed threshold */
+/** Tennis drill swing — needs torso + speed */
 export function detectDrillSwing(
   wristVelocityMs: number,
   spineFlexion: number,
   elbowAngle: number
 ): number | null {
-  const torsoOk = spineFlexion >= 4 && spineFlexion <= 50;
-  const armOk = elbowAngle >= 80;
-  if (wristVelocityMs < 1.8 || !torsoOk || !armOk) return null;
+  const torsoOk = spineFlexion >= 8 && spineFlexion <= 45;
+  const armOk = elbowAngle >= 95;
+  if (wristVelocityMs < 2.2 || !torsoOk || !armOk) return null;
   const now = Date.now();
-  if (now - swingState.lastAt < 500) return null;
+  if (now - swingState.lastAt < 600) return null;
   swingState.lastAt = now;
   return Math.round(wristVelocityMs * 100) / 100;
 }

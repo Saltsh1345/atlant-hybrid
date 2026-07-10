@@ -61,6 +61,7 @@ function SceneAvatar({
   criticalMeshes,
   idleAnimate,
   calmLighting,
+  ghostMode,
   onModelKind,
 }: {
   scene: THREE.Object3D;
@@ -72,6 +73,7 @@ function SceneAvatar({
   criticalMeshes?: string[];
   idleAnimate?: boolean;
   calmLighting?: boolean;
+  ghostMode?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
 }) {
   const hasMesh = useMemo(() => hasVisibleGeometry(scene), [scene]);
@@ -112,6 +114,7 @@ function SceneAvatar({
         compositionKnown: !!compositionMode,
         fatZones,
         bodyGrid: true,
+        ghost: ghostMode,
       });
     } else if (compositionMode) {
       applyCompositionVertexMaterials(
@@ -119,13 +122,14 @@ function SceneAvatar({
         fatPercent ?? 20,
         musclePercent ?? 40,
         fatZones,
-        { bodyGrid: true }
+        { bodyGrid: true, ghost: ghostMode }
       );
     } else {
       applyHologramTwinMaterials(prepared.object, {
         fatPercent: fatPercent ?? 0,
         musclePercent: musclePercent ?? 42,
         fatZones,
+        ghost: ghostMode,
       });
     }
 
@@ -146,6 +150,7 @@ function SceneAvatar({
     musclePercent,
     fatZones,
     criticalMeshes,
+    ghostMode,
   ]);
 
   useFrame(({ clock }) => {
@@ -153,7 +158,7 @@ function SceneAvatar({
 
     tickHologramMaterials(prepared.object, clock.getElapsedTime());
 
-    if (idleAnimate && !rigged) {
+    if (idleAnimate && !rigged && !ghostMode) {
       const t = clock.getElapsedTime();
       groupRef.current.rotation.y = Math.sin(t * 0.28) * 0.08;
       groupRef.current.position.y =
@@ -284,6 +289,7 @@ function AvatarScene({
   criticalMeshes,
   idleAnimate,
   calmLighting,
+  ghostMode,
   onModelKind,
 }: {
   asset: AvatarAsset | null;
@@ -295,6 +301,7 @@ function AvatarScene({
   criticalMeshes?: string[];
   idleAnimate?: boolean;
   calmLighting?: boolean;
+  ghostMode?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
 }) {
   useEffect(() => {
@@ -315,6 +322,7 @@ function AvatarScene({
         criticalMeshes={criticalMeshes}
         idleAnimate={idleAnimate}
         calmLighting={calmLighting}
+        ghostMode={ghostMode}
         onModelKind={onModelKind}
       />
     );
@@ -331,6 +339,7 @@ function AvatarScene({
       criticalMeshes={criticalMeshes}
       idleAnimate={idleAnimate}
       calmLighting={calmLighting}
+      ghostMode={ghostMode}
       onModelKind={onModelKind}
     />
   );
@@ -356,6 +365,12 @@ export interface AvatarViewerInnerProps {
   fillHeight?: boolean;
   /** Softer lights, no red alert flash, lime accent */
   calmLighting?: boolean;
+  /** Live PIP: wire-only ghost overlay on camera */
+  ghostMode?: boolean;
+  /** Transparent canvas — for picture-in-picture over video */
+  transparentBackground?: boolean;
+  /** Pull camera back so head/feet are not clipped in card */
+  frameFullBody?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
 }
 
@@ -376,6 +391,9 @@ export default function AvatarViewerInner({
   theme = "dark",
   fillHeight = false,
   calmLighting = false,
+  ghostMode = false,
+  transparentBackground = false,
+  frameFullBody = false,
   onModelKind,
 }: AvatarViewerInnerProps) {
   const rig = useMemo(
@@ -390,26 +408,42 @@ export default function AvatarViewerInner({
       : tall
         ? "h-52"
         : "h-48";
-  const canvasBg = "#000000";
-  const hasAlert = !calmLighting && (criticalMeshes?.length ?? 0) > 0;
-  const camZ = compositionMode || hasAlert ? 3.5 : 3.1;
-  const camY = 0.95;
+  const hasAlert = !calmLighting && !ghostMode && (criticalMeshes?.length ?? 0) > 0;
+  const camZ = ghostMode
+    ? 3.35
+    : frameFullBody || compositionMode
+      ? 4.05
+      : hasAlert
+        ? 3.5
+        : 3.1;
+  const camY = frameFullBody ? 0.88 : ghostMode ? 0.9 : 0.95;
+  const camFov = frameFullBody ? 31 : 34;
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-2xl bg-black ${heightClass}`}
+      className={`relative w-full overflow-hidden rounded-2xl ${
+        transparentBackground ? "bg-transparent" : "bg-black"
+      } ${heightClass}`}
       style={fillHeight ? { minHeight: 220 } : undefined}
     >
       {!assetReady && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/90">
+        <div
+          className={`absolute inset-0 z-10 flex items-center justify-center ${
+            transparentBackground ? "bg-black/40" : "bg-black/90"
+          }`}
+        >
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
         </div>
       )}
       <Canvas
-        gl={{ antialias: true, alpha: false, powerPreference: "default" }}
+        gl={{
+          antialias: true,
+          alpha: transparentBackground,
+          powerPreference: "default",
+        }}
         camera={{
           position: [0, camY, camZ],
-          fov: 34,
+          fov: camFov,
           near: 0.01,
           far: 1000,
         }}
@@ -422,14 +456,14 @@ export default function AvatarViewerInner({
         dpr={[1, 1.75]}
         resize={{ scroll: false, debounce: 100 }}
       >
-        <color attach="background" args={["#000000"]} />
-        <ambientLight intensity={0.05} />
+        {!transparentBackground && <color attach="background" args={["#000000"]} />}
+        <ambientLight intensity={ghostMode ? 0.02 : 0.05} />
         <pointLight
           position={[0, 1.6, 2]}
-          intensity={hasAlert ? 0.25 : 0.12}
+          intensity={hasAlert ? 0.25 : ghostMode ? 0.06 : 0.12}
           color={hasAlert ? "#f87171" : "#7dd3fc"}
         />
-        <AvatarFloorGrid pulse={hasAlert || !!calmLighting} />
+        <AvatarFloorGrid pulse={hasAlert || !!calmLighting} subtle={ghostMode} />
         <Suspense fallback={<AvatarLoader />}>
           <AvatarScene
             asset={asset}
@@ -441,10 +475,11 @@ export default function AvatarViewerInner({
             criticalMeshes={criticalMeshes}
             idleAnimate={idleAnimate}
             calmLighting={calmLighting}
+            ghostMode={ghostMode}
             onModelKind={onModelKind}
           />
         </Suspense>
-        {interactive && (
+        {interactive && !ghostMode && (
           <OrbitControls
             enableZoom={!compact}
             enablePan={false}
@@ -452,7 +487,7 @@ export default function AvatarViewerInner({
             dampingFactor={0.08}
             minPolarAngle={Math.PI / 5}
             maxPolarAngle={Math.PI / 1.85}
-            target={[0, 0.85, 0]}
+            target={[0, frameFullBody ? 0.9 : 0.85, 0]}
           />
         )}
       </Canvas>

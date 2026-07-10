@@ -85,10 +85,10 @@ export function analyzePoseLive(
       };
     }
     case "turn_left": {
-      const depthScore = clamp01((depth - 0.01) / 0.06);
-      const narrowScore = clamp01((0.26 - w) / 0.16);
+      const depthScore = clamp01((depth - 0.008) / 0.05);
+      const narrowScore = clamp01((0.28 - w) / 0.14);
       const progress = depthScore * 0.55 + narrowScore * 0.45;
-      const accepted = progress >= 0.75 && depth > 0.012;
+      const accepted = progress >= 0.62 && depth > 0.008;
       return {
         progress,
         accepted,
@@ -101,10 +101,10 @@ export function analyzePoseLive(
       };
     }
     case "turn_right": {
-      const depthScore = clamp01((-depth - 0.01) / 0.06);
-      const narrowScore = clamp01((0.26 - w) / 0.16);
+      const depthScore = clamp01((-depth - 0.008) / 0.05);
+      const narrowScore = clamp01((0.28 - w) / 0.14);
       const progress = depthScore * 0.55 + narrowScore * 0.45;
-      const accepted = progress >= 0.75 && depth < -0.012;
+      const accepted = progress >= 0.62 && depth < -0.008;
       return {
         progress,
         accepted,

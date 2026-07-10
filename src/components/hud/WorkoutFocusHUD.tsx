@@ -10,6 +10,7 @@ interface WorkoutFocusHUDProps {
   exercise?: StrengthExercise | null;
   reps?: number;
   formScore?: number;
+  eliteScore?: number;
   elapsedSec?: number;
   strikeLabel?: string;
   lastStrikeSpeed?: number | null;
@@ -28,6 +29,7 @@ export default function WorkoutFocusHUD({
   exercise,
   reps = 0,
   formScore = 0,
+  eliteScore = 0,
   elapsedSec = 0,
   strikeLabel,
   lastStrikeSpeed,
@@ -51,7 +53,10 @@ export default function WorkoutFocusHUD({
       ? { label: "Повторы", value: String(reps) }
       : { label: "BPM", value: String(bpm) };
 
-  const subRight = { label: "Техника", value: `${formScore}%` };
+  const subRight =
+    eliteScore > 0 && sport !== "strength"
+      ? { label: "Эталон", value: `${eliteScore}%` }
+      : { label: "Техника", value: `${formScore}%` };
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
@@ -127,7 +132,9 @@ export default function WorkoutFocusHUD({
             </p>
             <p
               className={`text-metric-lg ${
-                formScore >= 70 ? "text-success" : "text-[var(--neon-orange)]"
+                (eliteScore > 0 ? eliteScore : formScore) >= 70
+                  ? "text-success"
+                  : "text-[var(--neon-orange)]"
               }`}
             >
               {subRight.value}

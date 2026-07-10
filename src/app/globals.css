@@ -363,6 +363,20 @@ body {
     0 0 50px rgba(34, 211, 238, 0.07);
 }
 
+.atlant-twin-panel--live {
+  border: 1px solid rgba(34, 211, 238, 0.32);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 0 48px rgba(34, 211, 238, 0.1);
+}
+
+.atlant-twin-bg-live {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 85%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 15%, rgba(125, 211, 252, 0.05), transparent),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.88) 0%, rgba(2, 6, 23, 0.92) 55%, rgba(10, 18, 32, 0.9) 100%);
+}
+
 .atlant-twin-bg {
   background:
     radial-gradient(ellipse 70% 55% at 50% 85%, rgba(14, 165, 233, 0.18), transparent 60%),
@@ -398,6 +412,19 @@ body {
   border-color: rgba(34, 211, 238, 0.35);
   background: rgba(2, 6, 23, 0.75);
   color: #7dd3fc;
+}
+
+.atlant-hud-pill--pip {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.55rem;
+  border-color: rgba(34, 211, 238, 0.4);
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.atlant-hud-tag--pip {
+  font-size: 0.55rem;
+  padding: 0.15rem 0.35rem;
+  background: rgba(2, 6, 23, 0.6);
 }
 
 .atlant-hud-tag {

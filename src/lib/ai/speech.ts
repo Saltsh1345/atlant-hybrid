@@ -11,6 +11,56 @@ export function isVoiceMuted(): boolean {
   return voiceMuted;
 }
 
+export function speakLongText(
+  text: string,
+  opts?: { rate?: number; onEnd?: () => void }
+): void {
+  if (typeof window === "undefined" || !window.speechSynthesis) {
+    opts?.onEnd?.();
+    return;
+  }
+  if (voiceMuted) {
+    opts?.onEnd?.();
+    return;
+  }
+
+  const chunks = text
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/(?<=[.!?…])\s+/)
+    .filter((s) => s.length > 8)
+    .slice(0, 12);
+
+  if (chunks.length === 0) {
+    speak(text.slice(0, 500), opts);
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  let i = 0;
+  const next = () => {
+    if (i >= chunks.length) {
+      speaking = false;
+      opts?.onEnd?.();
+      return;
+    }
+    const utter = new SpeechSynthesisUtterance(chunks[i]);
+    utter.lang = "ru-RU";
+    utter.rate = opts?.rate ?? 0.92;
+    utter.onend = () => {
+      i += 1;
+      next();
+    };
+    utter.onerror = () => {
+      i += 1;
+      next();
+    };
+    speaking = true;
+    window.speechSynthesis.speak(utter);
+  };
+  next();
+}
+
 export function speak(
   text: string,
   opts?: { rate?: number; pitch?: number; volume?: number; onEnd?: () => void }

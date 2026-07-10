@@ -35,16 +35,22 @@ export function waitForLivePose(
   step: CalibrationStep,
   getLandmarks: () => NormalizedLandmark[] | null,
   onTick?: (progress: number, feedback: string, metrics: string) => void,
-  onNudge?: (feedback: string) => void
+  onNudge?: (feedback: string) => void,
+  maxMs = 22_000
 ): Promise<void> {
   skipPoseWait = false;
   return new Promise((resolve) => {
     let hold = 0;
     let lastNudge = Date.now();
+    const started = Date.now();
 
     const tick = () => {
       if (skipPoseWait) {
         skipPoseWait = false;
+        resolve();
+        return;
+      }
+      if (Date.now() - started > maxMs) {
         resolve();
         return;
       }

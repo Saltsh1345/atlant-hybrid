@@ -8,11 +8,16 @@ import SessionStats from "@/components/analysis/SessionStats";
 import VelocityChart from "@/components/charts/VelocityChart";
 import { useAppStore } from "@/store/useAppStore";
 import { useDashboardLayoutStore } from "@/store/useDashboardLayoutStore";
-import { speak } from "@/lib/ai/speech";
+import { speak, speakLongText } from "@/lib/ai/speech";
 import { getPeakPunchSpeed, getPeakVelocity } from "@/lib/pose/vbt";
 import { getRepCount, getPunchCount, getSwingCount } from "@/lib/pose/repCounter";
 import { getDrillFixations, drillSummary } from "@/lib/training/drillResults";
+import { getSessionVideoClips } from "@/lib/training/sessionVideoClips";
+import type { VideoClipAnalysis } from "@/lib/ai/geminiVideoAnalysis";
+import type { YoloClipSignal } from "@/lib/ai/yoloActions";
 import { getAvgFormScore } from "@/lib/pose/formScore";
+import { getAvgEliteScore } from "@/lib/elite";
+import EliteBenchmarkCard from "@/components/analysis/EliteBenchmarkCard";
 import type { Sport } from "@/types";
 
 function fallbackAnalysisLocal(
@@ -41,10 +46,15 @@ function fallbackAnalysisLocal(
 }
 
 function speakAnalysisSummary(text: string) {
+  const paragraphs = text
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   const spoken =
-    text.split(/\n\n+/).find((p) => p.trim().length > 20) ??
-    text.slice(0, 280);
-  speak(spoken);
+    paragraphs.length > 0
+      ? paragraphs.slice(0, 4).join(" ")
+      : text;
+  speakLongText(spoken.slice(0, 2400));
 }
 
 function AnalysisBody({ text }: { text: string }) {
@@ -77,6 +87,8 @@ export default function AnalysisScreen() {
   const [analysis, setAnalysis] = useState("");
   const [source, setSource] = useState<"gemini" | "fallback">("fallback");
   const [analysisReason, setAnalysisReason] = useState<string>("");
+  const [clipAnalyses, setClipAnalyses] = useState<VideoClipAnalysis[]>([]);
+  const [yoloSignals, setYoloSignals] = useState<YoloClipSignal[]>([]);
   const endedRef = useRef(false);
 
   const selectedSport = useAppStore((s) => s.selectedSport)!;
@@ -105,9 +117,13 @@ export default function AnalysisScreen() {
     ? Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000))
     : 1;
   const formScore = getAvgFormScore();
+  const eliteScore = getAvgEliteScore();
   const peakVelocity = getPeakVelocity();
   const reps = selectedSport === "strength" ? getRepCount() : undefined;
   const drillFixations = getDrillFixations();
+  const drillFixationsUnique = [
+    ...new Map(drillFixations.map((f) => [f.commandId, f])).values(),
+  ];
   const drillStats = drillSummary();
   const punches =
     selectedSport === "boxing"
@@ -136,7 +152,8 @@ export default function AnalysisScreen() {
 
     (async () => {
       try {
-        const res = await fetch("/api/gemini/analyze", {
+        const videoClips = getSessionVideoClips();
+        const res = await fetch("/api/gemini/analyze-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -158,7 +175,10 @@ export default function AnalysisScreen() {
               speedMs: f.speedMs,
               accuracy: f.accuracy,
               fixed: f.fixed,
+              eliteOverall: f.eliteOverall,
             })),
+            eliteScore: drillStats.avgEliteOverall || eliteScore,
+            clips: videoClips,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -184,6 +204,10 @@ export default function AnalysisScreen() {
         setAnalysisReason(
           typeof data.reason === "string" && data.reason ? data.reason : ""
         );
+        setClipAnalyses(
+          Array.isArray(data.clipAnalyses) ? data.clipAnalyses : []
+        );
+        setYoloSignals(Array.isArray(data.yoloSignals) ? data.yoloSignals : []);
         setAnalysis(text);
         endSession(text, stats);
         speakAnalysisSummary(text);
@@ -228,7 +252,12 @@ export default function AnalysisScreen() {
             source === "gemini" ? "text-success" : "text-warning"
           }`}
         >
-          Источник анализа: {source === "gemini" ? "Gemini AI" : "Fallback"}
+          Источник анализа:{" "}
+          {source === "gemini"
+            ? clipAnalyses.length > 0
+              ? `Gemini AI · видео (${clipAnalyses.length} клип.)${yoloSignals.length ? " + YOLO" : ""}`
+              : "Gemini AI"
+            : "Fallback"}
         </p>
       )}
 
@@ -239,10 +268,16 @@ export default function AnalysisScreen() {
         avgVelocity={avgVelocity}
         peakVelocity={peakVelocity}
         formScore={formScore}
+        eliteScore={drillStats.avgEliteOverall || eliteScore}
         fatigue={kinematics.fatiguePercent}
         reps={reps}
         punches={punches}
         swings={swings}
+      />
+
+      <EliteBenchmarkCard
+        sport={selectedSport}
+        drillAvgElite={drillStats.avgEliteOverall}
       />
 
       {sessionSamples.length > 1 && (
@@ -254,34 +289,97 @@ export default function AnalysisScreen() {
         </Card>
       )}
 
-      {drillFixations.length > 0 && (
+      {drillFixationsUnique.length > 0 && (
         <Card className="mb-4">
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
             Фиксация ударов
           </p>
           <ul className="space-y-2 text-sm">
-            {drillFixations.map((f, i) => (
+            {drillFixationsUnique.map((f, i) => {
+              const video = clipAnalyses.find(
+                (c) =>
+                  c.label === f.commandText ||
+                  c.expectedAction === f.type
+              );
+              return (
               <li
                 key={`${f.commandId}-${i}`}
-                className="flex justify-between gap-2 border-b border-border pb-2"
+                className="border-b border-border pb-2"
               >
-                <span>{f.commandText}</span>
-                <span
-                  className={
-                    f.fixed ? "text-success" : "text-warning"
-                  }
-                >
-                  {f.speedMs > 0
-                    ? `${f.speedMs} м/с · ${f.accuracy}%`
-                    : "пропуск"}
-                </span>
+                <div className="flex justify-between gap-2">
+                  <span>{f.commandText}</span>
+                  <span
+                    className={
+                      f.fixed ? "text-success" : "text-warning"
+                    }
+                  >
+                    {f.speedMs > 0
+                      ? `${f.speedMs} м/с · ${f.accuracy}%${
+                          f.eliteOverall
+                            ? ` · эталон ${f.eliteOverall}%`
+                            : ""
+                        }`
+                      : "пропуск"}
+                  </span>
+                </div>
+                {video && (
+                  <p className="mt-1 text-[11px] text-muted">
+                    Видео: {video.actionDetected}
+                    {video.matchesExpected ? " · совпало" : " · не совпало"} ·
+                    техника {video.techniqueScore}%
+                  </p>
+                )}
               </li>
-            ))}
+            );
+            })}
           </ul>
           <p className="mt-2 text-xs text-muted">
             Средняя скорость: {drillStats.avgSpeed} м/с · точность:{" "}
             {drillStats.avgAccuracy}%
           </p>
+        </Card>
+      )}
+
+      {clipAnalyses.length > 0 && drillFixations.length === 0 && (
+        <Card className="mb-4">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
+            Видеоанализ движений
+          </p>
+          <ul className="space-y-3 text-sm">
+            {clipAnalyses.map((c) => (
+              <li key={c.clipId} className="border-b border-border pb-2">
+                <p className="font-medium text-foreground">{c.label}</p>
+                <p className="text-xs text-muted">
+                  На видео: {c.actionDetected} ·{" "}
+                  {c.matchesExpected ? "совпало с заданием" : "не совпало"} ·
+                  техника {c.techniqueScore}%
+                </p>
+                <p className="mt-1 text-xs text-foreground-secondary">
+                  {c.briefSummary}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {yoloSignals.length > 0 && (
+        <Card className="mb-4">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
+            YOLO детекция действий
+          </p>
+          <ul className="space-y-2 text-sm">
+            {yoloSignals.map((s) => (
+              <li key={s.clipId} className="flex justify-between border-b border-border pb-2">
+                <span>
+                  {s.action} · {Math.round(s.confidence * 100)}%
+                </span>
+                <span className={s.matchesExpected ? "text-success" : "text-warning"}>
+                  {s.matchesExpected ? "совпало" : "не совпало"}
+                </span>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 
@@ -291,7 +389,7 @@ export default function AnalysisScreen() {
             <div className="h-4 animate-pulse rounded bg-border" />
             <div className="h-4 w-3/4 animate-pulse rounded bg-border" />
             <p className="text-center text-sm text-muted">
-              Биомеханический разбор техники и план тренировок…
+              Gemini смотрит видео с камеры и строит разбор техники…
             </p>
           </div>
         ) : (

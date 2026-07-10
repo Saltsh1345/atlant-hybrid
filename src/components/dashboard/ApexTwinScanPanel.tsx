@@ -70,7 +70,7 @@ export default function ApexTwinScanPanel({
             </span>
           </div>
         </div>
-        <div className="min-h-[320px] p-3 md:p-4">
+        <div className="min-h-[420px] p-3 md:p-4">
           <DigitalTwinCard
             bodyDataLocked={bodyDataLocked}
             latchedBody={latchedBody}

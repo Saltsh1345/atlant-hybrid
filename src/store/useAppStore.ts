@@ -13,10 +13,21 @@ import type {
   TrackingMode,
   HealthReadiness,
 } from "@/types";
+import type { VideoDiagnosticReport, TrainingProgram, ExerciseLog } from "@/types/training";
+import { computeMuscleReadiness } from "@/lib/readiness";
+import { runVideoDiagnostics } from "@/lib/diagnostics/videoDiagnostics";
+import { generateTrainingProgram } from "@/lib/training/programEngine";
+import { buildExerciseLogFromSession } from "@/lib/training/sessionLog";
 import { canTransition, trackingModeForPhase } from "@/lib/stateMachine";
+import { defaultFatZones } from "@/lib/body/fatZones";
 import { simulateBodyComposition } from "@/lib/calibration/bodySimulator";
 import type { ScanAnalysis } from "@/lib/calibration/scanAnalysis";
 import { setVoiceMuted as applyVoiceMuted } from "@/lib/ai/speech";
+import {
+  defaultCalibrationForDevice,
+  isStaleCalibration,
+  type CameraCalibration,
+} from "@/lib/camera/cameraCalibration";
 
 const DEFAULT_KINEMATICS: LiveKinematics = {
   bpm: 72,
@@ -58,6 +69,11 @@ interface AppStore {
   lastSession: SessionSummary | null;
   sessionHistory: SessionSummary[];
 
+  /** Видеодиагностика слабых зон */
+  diagnosticReport: VideoDiagnosticReport | null;
+  trainingProgram: TrainingProgram | null;
+  exerciseLogs: ExerciseLog[];
+
   avatarMissing: boolean;
   calibrationScriptIndex: number;
   voiceMuted: boolean;
@@ -65,8 +81,14 @@ interface AppStore {
   healthReadiness: HealthReadiness | null;
   healthConnected: boolean;
 
+  cameraCalibration: CameraCalibration | null;
+
   setPhase: (phase: AppPhase) => boolean;
+  setCameraCalibration: (cal: CameraCalibration) => void;
+  ensureCameraCalibration: () => CameraCalibration;
   setProfile: (profile: UserProfile) => void;
+  /** Update stature from camera pose estimate (smoothed, no jitter). */
+  patchProfileHeight: (heightCm: number) => void;
   setCalibrationStep: (step: CalibrationStep) => void;
   advanceCalibrationScript: () => void;
 
@@ -90,6 +112,9 @@ interface AppStore {
       peakVelocity?: number;
     }
   ) => SessionSummary | null;
+  refreshVideoDiagnostics: () => VideoDiagnosticReport | null;
+  refreshTrainingProgram: () => TrainingProgram | null;
+  logExerciseFromSession: (summary: SessionSummary) => void;
   setAvatarMissing: (v: boolean) => void;
   resetCalibration: () => void;
   unlockForRescan: () => void;
@@ -119,12 +144,16 @@ export const useAppStore = create<AppStore>()(
       sessionStartTime: null,
       lastSession: null,
       sessionHistory: [],
+      diagnosticReport: null,
+      trainingProgram: null,
+      exerciseLogs: [],
       avatarMissing: false,
       calibrationScriptIndex: 0,
       voiceMuted: false,
       rescanPending: false,
       healthReadiness: null,
       healthConnected: false,
+      cameraCalibration: null,
 
       setPhase: (phase) => {
         const current = get().phase;
@@ -138,6 +167,32 @@ export const useAppStore = create<AppStore>()(
 
       setProfile: (profile) => set({ profile }),
 
+      patchProfileHeight: (heightCm) => {
+        const clamped = Math.max(145, Math.min(205, Math.round(heightCm)));
+        const p = get().profile ?? DEFAULT_PROFILE;
+        if (Math.abs(p.height - clamped) < 2) return;
+        set({ profile: { ...p, height: clamped } });
+      },
+
+      setCameraCalibration: (cal) => set({ cameraCalibration: cal }),
+
+      ensureCameraCalibration: () => {
+        const existing = get().cameraCalibration;
+        if (existing && !isStaleCalibration(existing)) {
+          return existing;
+        }
+        const cal = defaultCalibrationForDevice();
+        const p = get().profile ?? DEFAULT_PROFILE;
+        const profile =
+          p.height === DEFAULT_PROFILE.height && cal.userHeightCm
+            ? { ...p, height: cal.userHeightCm }
+            : p.height > 205 || p.height < 150
+              ? { ...p, height: cal.userHeightCm ?? 175 }
+              : p;
+        set({ cameraCalibration: cal, profile });
+        return cal;
+      },
+
       setCalibrationStep: (step) => set({ calibrationStep: step }),
 
       advanceCalibrationScript: () =>
@@ -149,12 +204,16 @@ export const useAppStore = create<AppStore>()(
         if (!profile) return null;
         const latched = simulateBodyComposition(profile, scan);
         set({ latchedBody: latched, bodyDataLocked: true });
+        get().refreshVideoDiagnostics();
+        get().refreshTrainingProgram();
         return latched;
       },
 
       latchBodyResult: (data) => {
         if (get().bodyDataLocked) return get().latchedBody;
         set({ latchedBody: data, bodyDataLocked: true });
+        get().refreshVideoDiagnostics();
+        get().refreshTrainingProgram();
         return data;
       },
 
@@ -219,7 +278,54 @@ export const useAppStore = create<AppStore>()(
           sessionStartTime: null,
           sessionHistory: [summary, ...s.sessionHistory].slice(0, 20),
         }));
+        get().logExerciseFromSession(summary);
+        get().refreshVideoDiagnostics();
+        get().refreshTrainingProgram();
         return summary;
+      },
+
+      refreshVideoDiagnostics: () => {
+        const { latchedBody, profile, sessionHistory } = get();
+        const p = profile ?? get().ensureProfile();
+        const readiness = computeMuscleReadiness(
+          latchedBody,
+          get().lastSession,
+          sessionHistory
+        );
+        const report = runVideoDiagnostics({
+          latchedBody,
+          profile: p,
+          sessionHistory,
+          readiness,
+        });
+        set({ diagnosticReport: report });
+        return report;
+      },
+
+      refreshTrainingProgram: () => {
+        const report = get().diagnosticReport ?? get().refreshVideoDiagnostics();
+        if (!report) return null;
+        const p = get().profile ?? get().ensureProfile();
+        const readiness = computeMuscleReadiness(
+          get().latchedBody,
+          get().lastSession,
+          get().sessionHistory
+        );
+        const program = generateTrainingProgram({
+          diagnostic: report,
+          profile: p,
+          readiness,
+        });
+        set({ trainingProgram: program });
+        return program;
+      },
+
+      logExerciseFromSession: (summary) => {
+        const log = buildExerciseLogFromSession(summary);
+        if (!log) return;
+        set((s) => ({
+          exerciseLogs: [log, ...s.exerciseLogs].slice(0, 100),
+        }));
       },
 
       setAvatarMissing: (avatarMissing) => set({ avatarMissing }),
@@ -271,6 +377,9 @@ export const useAppStore = create<AppStore>()(
           bodyDataLocked: false,
           lastSession: null,
           sessionHistory: [],
+          diagnosticReport: null,
+          trainingProgram: null,
+          exerciseLogs: [],
           voiceMuted: false,
           healthReadiness: null,
           healthConnected: false,
@@ -292,9 +401,13 @@ export const useAppStore = create<AppStore>()(
         bodyDataLocked: s.bodyDataLocked,
         lastSession: s.lastSession,
         sessionHistory: s.sessionHistory,
+        diagnosticReport: s.diagnosticReport,
+        trainingProgram: s.trainingProgram,
+        exerciseLogs: s.exerciseLogs,
         voiceMuted: s.voiceMuted,
         healthReadiness: s.healthReadiness,
         healthConnected: s.healthConnected,
+        cameraCalibration: s.cameraCalibration,
         phase:
           s.phase === "training" ||
           s.phase === "settings" ||
@@ -304,6 +417,12 @@ export const useAppStore = create<AppStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.voiceMuted) applyVoiceMuted(true);
+        if (state?.latchedBody && !state.latchedBody.fatZones) {
+          state.latchedBody = {
+            ...state.latchedBody,
+            fatZones: defaultFatZones(state.latchedBody.fatPercent),
+          };
+        }
       },
     }
   )

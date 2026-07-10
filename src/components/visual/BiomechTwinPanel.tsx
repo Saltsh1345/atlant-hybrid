@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 import AvatarViewer from "@/components/three/AvatarViewer";
 import { useAvatarAsset } from "@/hooks/useAvatarAsset";
+import { fatZonesFromPercent } from "@/lib/body/fatZones";
 import { criticalMusclesFromSession } from "@/lib/three/muscleGroups";
-import type { LatchedBodyData, SessionSummary } from "@/types";
+import type { LatchedBodyData, NormalizedLandmark, SessionSummary } from "@/types";
 
 interface BiomechTwinPanelProps {
   latchedBody?: LatchedBodyData | null;
@@ -15,8 +16,11 @@ interface BiomechTwinPanelProps {
   className?: string;
   lastSession?: SessionSummary | null;
   criticalMeshes?: string[];
+  landmarks?: NormalizedLandmark[] | null;
   /** Soft dashboard look: no wireframe, no red “critical” scare, calm HUD */
   calm?: boolean;
+  /** Live camera screen: full hologram over video, not tiny PIP */
+  live?: boolean;
 }
 
 export default function BiomechTwinPanel({
@@ -28,40 +32,57 @@ export default function BiomechTwinPanel({
   className = "",
   lastSession = null,
   criticalMeshes: criticalOverride,
+  landmarks = null,
   calm = false,
+  live = false,
 }: BiomechTwinPanelProps) {
   const { asset, ready, error: assetError } = useAvatarAsset();
   const fat = latchedBody?.fatPercent ?? 22;
   const muscle = latchedBody?.musclePercent ?? 42;
   const compositionKnown = locked && !!latchedBody;
+  const fatZones = useMemo(
+    () => fatZonesFromPercent(fat, latchedBody?.fatZones),
+    [fat, latchedBody?.fatZones]
+  );
+  const poseLinked = !!landmarks?.length;
 
   const criticalMeshes = useMemo(() => {
-    // Explicit override always wins (live twin / training technique)
     if (criticalOverride?.length) return criticalOverride;
-    // Dashboard calm preview: no scare red
-    if (calm) return [];
+    if (calm && !live) return [];
     return criticalMusclesFromSession(lastSession);
-  }, [calm, criticalOverride, lastSession]);
+  }, [calm, live, criticalOverride, lastSession]);
 
   const hasCritical = criticalMeshes.length > 0;
   const techniqueHint =
     !calm && lastSession?.formScore != null && lastSession.formScore < 55;
 
+  const panelTone = live ? "live" : calm ? "calm" : "default";
+
   return (
     <div
       className={`atlant-twin-panel relative overflow-hidden rounded-2xl ${
-        calm ? "atlant-twin-panel--calm" : ""
+        panelTone === "live"
+          ? "atlant-twin-panel--live"
+          : panelTone === "calm"
+            ? "atlant-twin-panel--calm"
+            : ""
       } ${
-        compact
-          ? "h-48"
-          : tall
-            ? "h-56 sm:h-64 md:h-72 lg:h-[min(480px,52vh)]"
-            : "h-64"
+        live
+          ? "h-[min(52vh,460px)] w-full"
+          : compact
+            ? "h-48"
+            : tall
+              ? "h-56 sm:h-64 md:h-72 lg:h-[min(480px,52vh)]"
+              : "h-64"
       } ${className}`}
     >
       <div
         className={`absolute inset-0 ${
-          calm ? "atlant-twin-bg-calm" : "atlant-twin-bg"
+          live
+            ? "atlant-twin-bg-live"
+            : calm
+              ? "atlant-twin-bg-calm"
+              : "atlant-twin-bg"
         }`}
       />
 
@@ -69,23 +90,23 @@ export default function BiomechTwinPanel({
         <>
           <div
             className={`atlant-hud-pill absolute left-3 top-3 z-10 ${
-              calm ? "atlant-hud-pill--calm" : ""
+              calm || live ? "atlant-hud-pill--calm" : ""
             }`}
           >
             <span
               className={`h-2 w-2 rounded-full ${
-                calm
+                calm || live
                   ? "bg-[var(--neon-lime,#ccff00)]"
                   : hasCritical
                     ? "bg-red-500"
                     : "bg-orange-400"
               }`}
             />
-            {calm ? "Голограмма" : "Биомеханика"}
+            {live ? "Живой двойник" : calm ? "Голограмма" : "Биомеханика"}
           </div>
           <div
             className={`atlant-hud-pill absolute right-3 top-3 z-10 ${
-              calm
+              calm || live
                 ? "atlant-hud-pill--calm"
                 : hasCritical
                   ? "!border-red-200 !text-red-700"
@@ -94,7 +115,7 @@ export default function BiomechTwinPanel({
           >
             <span
               className={`h-2 w-2 rounded-full ${
-                calm
+                calm || live
                   ? compositionKnown
                     ? "bg-cyan-400"
                     : "bg-cyan-700"
@@ -103,7 +124,7 @@ export default function BiomechTwinPanel({
                     : "animate-pulse bg-emerald-500"
               }`}
             />
-            {calm
+            {calm || live
               ? compositionKnown
                 ? "Скан OK"
                 : "MESH"
@@ -159,15 +180,17 @@ export default function BiomechTwinPanel({
             compositionMode={compositionKnown}
             fatPercent={fat}
             musclePercent={muscle}
-            fatZones={latchedBody?.fatZones}
+            fatZones={fatZones}
             criticalMeshes={criticalMeshes}
-            idleAnimate
+            landmarks={landmarks}
+            idleAnimate={live ? !poseLinked : true}
             theme="dark"
             fillHeight
-            tall={tall}
+            tall={!compact}
             compact={compact}
-            interactive
-            calmLighting={calm}
+            interactive={!live}
+            calmLighting={calm || live}
+            frameFullBody={!compact}
           />
         )}
       </div>

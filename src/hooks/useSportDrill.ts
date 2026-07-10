@@ -12,6 +12,12 @@ export interface DrillHitPayload {
   speedMs: number;
   accuracy: number;
   elbowAngle: number;
+  valid?: boolean;
+  rejectionReason?: string;
+  eliteOverall?: number;
+  eliteTechnique?: number;
+  eliteActionMatch?: number;
+  eliteDeviations?: string[];
 }
 
 interface SportDrillController {
@@ -72,7 +78,12 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
 
       const accuracy = payload.accuracy;
       const speed = payload.speedMs;
-      const ok = speed >= 1.5 && accuracy >= 45;
+      const techniqueOk =
+        payload.valid !== false &&
+        speed >= 2.2 &&
+        accuracy >= 52 &&
+        (payload.eliteActionMatch ?? 100) >= 50;
+      const ok = techniqueOk;
 
       addDrillFixation({
         commandId: command.id,
@@ -82,19 +93,31 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
         accuracy,
         elbowAngle: payload.elbowAngle,
         fixed: ok,
+        eliteOverall: payload.eliteOverall,
+        eliteTechnique: payload.eliteTechnique,
+        eliteActionMatch: payload.eliteActionMatch,
+        eliteDeviations: payload.eliteDeviations,
       });
 
       setFixedCount((c) => c + (ok ? 1 : 0));
-      const msg = ok
-        ? `Скорость ${speed} м/с · точность ${accuracy}%`
-        : `Слабый удар ${speed} м/с — точность ${accuracy}%`;
+      const elitePart =
+        ok && payload.eliteOverall != null && payload.eliteOverall > 0
+          ? ` · эталон ${payload.eliteOverall}%`
+          : "";
+      const msg = payload.rejectionReason
+        ? payload.rejectionReason
+        : ok
+          ? `Скорость ${speed} м/с · точность ${accuracy}%${elitePart}`
+          : `Слабый удар ${speed} м/с — точность ${accuracy}%`;
       setFixationText(msg);
       setPhaseSafe("fixation");
       sayOnce(
         `drill:${command.id}:hit`,
-        ok
-          ? `Удар зафиксирован. ${speed} метров в секунду. Точность ${accuracy} процентов.`
-          : `Удар слабый. Скорость ${speed}. Разверните корпус и выпрямите локоть.`
+        payload.rejectionReason
+          ? payload.rejectionReason
+          : ok
+            ? `Удар зафиксирован. ${speed} метров в секунду. Точность ${accuracy} процентов.`
+            : `Удар слабый. Скорость ${speed}. Разверните корпус и выпрямите локоть.`
       );
     },
     [command, setPhaseSafe]
@@ -162,7 +185,7 @@ export function useSportDrill(commands: DrillCommand[]): SportDrillController {
           setPhaseSafe("complete");
           sayOnce(
             "drill:complete",
-            "Серия завершена. Нажмите «Анализ» для отчёта и плана тренировки."
+            "Серия завершена. Через несколько секунд откроется анализ."
           );
           return;
         }

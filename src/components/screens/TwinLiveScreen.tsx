@@ -38,14 +38,15 @@ export default function TwinLiveScreen() {
   }, [tick]);
 
   return (
-    <div className="relative min-h-dvh bg-background">
+    <div className="relative min-h-dvh bg-black">
       <video
         ref={videoRef}
-        className="absolute inset-0 h-full w-full scale-x-[-1] object-cover opacity-30"
+        className="absolute inset-0 h-full w-full scale-x-[-1] object-cover opacity-45"
         playsInline
         muted
         autoPlay
       />
+
       <CameraStatusOverlay
         cameraStatus={cameraStatus}
         cameraError={cameraError}
@@ -54,24 +55,22 @@ export default function TwinLiveScreen() {
       />
       <PoseOverlay landmarks={landmarks} />
 
-      <div className="relative z-10 flex min-h-dvh flex-col px-4 py-6">
+      <div className="relative z-10 flex min-h-dvh flex-col px-4 py-5">
         <button
           type="button"
           onClick={() => setPhase("dashboard")}
-          className="mb-4 self-start text-sm text-foreground-secondary hover:text-foreground"
+          className="mb-3 self-start text-sm text-white/80 hover:text-white"
         >
           ← Дашборд
         </button>
 
-        <h1 className="mb-1 text-xl font-bold text-foreground">
-          Цифровой двойник
-        </h1>
-        <p className="mb-4 text-xs text-muted">
-          Голографический mesh · мышцы и жир по скану · техника подсвечивается
+        <h1 className="mb-1 text-xl font-bold text-white">Цифровой двойник</h1>
+        <p className="mb-3 text-xs text-white/60">
+          Голографический mesh · мышцы и жир по скану · поза с камеры
         </p>
 
         {latchedBody && (
-          <p className="mb-3 text-xs text-success">
+          <p className="mb-3 text-xs text-cyan-300">
             Жир {latchedBody.fatPercent}% · Мышцы {latchedBody.musclePercent}%
             {criticalMeshes.length > 0
               ? ` · критичных зон: ${criticalMeshes.length}`
@@ -79,32 +78,34 @@ export default function TwinLiveScreen() {
           </p>
         )}
 
-        <div className="flex-1">
+        <div className="mx-auto w-full max-w-2xl shrink-0">
           <BiomechTwinPanel
             latchedBody={latchedBody}
             locked={bodyDataLocked}
             lastSession={lastSession}
             criticalMeshes={criticalMeshes}
-            tall
+            landmarks={landmarks}
+            live
             showHud
             calm
-            className="h-full min-h-[320px]"
           />
         </div>
 
-        <p className="mt-4 text-center text-[10px] text-muted">
-          После скана жир теплее (янтарь), мышцы ярче (cyan). Слабая техника —
-          красная подсветка групп.
+        <p className="mt-4 text-center text-[10px] text-white/50">
+          Камера видна по краям. После скана жир теплее (янтарь), мышцы ярче
+          (cyan). Слабая техника — мягкая подсветка групп.
         </p>
 
-        <Button
-          size="lg"
-          variant="secondary"
-          className="mt-4"
-          onClick={() => setPhase("dashboard")}
-        >
-          На дашборд
-        </Button>
+        <div className="mt-auto pt-4">
+          <Button
+            size="lg"
+            variant="secondary"
+            className="w-full"
+            onClick={() => setPhase("dashboard")}
+          >
+            На дашборд
+          </Button>
+        </div>
       </div>
     </div>
   );

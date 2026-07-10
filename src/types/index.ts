@@ -23,7 +23,7 @@ export type CalibrationStep =
   | "biomech_ready"
   | "visualization"
   | "complete"
-  /** Laptop-friendly scan: upper body close, then rotate, then step back + squat */
+  /** Laptop scan: upper body + profile turns + 360° (no squat) */
   | "upper_body"
   | "arms_up"
   | "rotate_360"
@@ -119,12 +119,23 @@ export interface LatchedBodyData {
   lockedAt: string;
   clothingDetected?: boolean;
   scanNote?: string;
-  /** Where to paint fat on the twin (Gemini zones, not crude arm capsules). */
   fatZones?: FatZoneMap;
   posture?: PostureReport;
-  /** Short Gemini body report for the user. */
   geminiReport?: string;
   source?: "gemini" | "local";
+  /** Measured / estimated dimensions from scan (cm). */
+  anthropometrics?: import("@/lib/bio/anthropometry").BodyAnthropometrics;
+  /** Body proportion fingerprint for re-verification. */
+  bioSignature?: import("@/lib/bio/bodySignature").BodyBioSignature;
+  /** Scan trust score 0–100 and tier. */
+  scanQuality?: import("@/lib/bio/scanQuality").BioScanQuality;
+  /** Total body mass used for kg breakdown (from profile). */
+  totalWeightKg?: number;
+  /** Stature used in analysis (cm). */
+  heightCm?: number;
+  heightSource?: "profile" | "measured" | "estimated";
+  clothingReason?: string;
+  clothingConfidence?: number;
 }
 
 export interface LiveKinematics {

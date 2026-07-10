@@ -5,14 +5,19 @@ import Button from "@/components/ui/Button";
 import StrikeEffects, {
   type StrikeBurst,
 } from "@/components/camera/StrikeEffects";
-import AutoFrameViewport from "@/components/camera/AutoFrameViewport";
+import CoachCameraViewport from "@/components/camera/CoachCameraViewport";
+import CameraFacingToggle from "@/components/camera/CameraFacingToggle";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import CountdownOverlay from "@/components/training/CountdownOverlay";
+import SilhouetteSetupGate from "@/components/training/SilhouetteSetupGate";
 import RestTimerOverlay from "@/components/training/RestTimerOverlay";
 import WorkoutFocusHUD from "@/components/hud/WorkoutFocusHUD";
 import LiveScanGrid from "@/components/visual/LiveScanGrid";
 import BiomechTwinPanel from "@/components/visual/BiomechTwinPanel";
-import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
+import { usePoseTracker } from "@/hooks/usePoseTracker";
+import { useCameraDevice } from "@/hooks/useCameraDevice";
+import type { CameraFacing } from "@/lib/camera/deviceProfile";
+import type { CoachContext } from "@/lib/camera/positionCoach";
 import { useAppStore } from "@/store/useAppStore";
 import { criticalMusclesFromLive } from "@/lib/three/muscleGroups";
 import { computeKinematics, resetVbtState } from "@/lib/pose/vbt";
@@ -28,16 +33,29 @@ import {
   pushFormSample,
   resetFormScore,
 } from "@/lib/pose/formScore";
+import {
+  computeEliteScore,
+  kinematicsToFeatures,
+  pushEliteSample,
+  resetEliteSession,
+} from "@/lib/elite";
 import { coachForExercise, exerciseLabel } from "@/lib/pose/exercises";
 import { drillForSport } from "@/lib/training/drillProtocol";
+import { validateDrillHit } from "@/lib/training/drillHitValidation";
+import { resetSessionVideoClips } from "@/lib/training/sessionVideoClips";
 import { useSportDrill } from "@/hooks/useSportDrill";
+import { useSessionVideoCapture } from "@/hooks/useSessionVideoCapture";
 import SportDrillOverlay from "@/components/training/SportDrillOverlay";
 import { speakGuidance, stopSpeaking } from "@/lib/ai/speech";
+import { estimateDistanceMeters } from "@/lib/camera/distanceEstimator";
+import { estimateHeightFromPose } from "@/lib/camera/heightEstimator";
+import { resetDistanceSmoother } from "@/lib/camera/distanceSmoother";
 import type { NormalizedLandmark } from "@/types";
 import { LM } from "@/lib/pose/landmarks";
 
 export default function TrainingScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const landmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[] | null>(null);
   const [coachText, setCoachText] = useState("");
   const [strikeFlash, setStrikeFlash] = useState(false);
@@ -47,8 +65,19 @@ export default function TrainingScreen() {
   const [reps, setReps] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [countdownDone, setCountdownDone] = useState(false);
+  const [setupDone, setSetupDone] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<CameraFacing>("user");
   const [resting, setResting] = useState(false);
   const [formScore, setFormScore] = useState(0);
+  const [eliteScore, setEliteScore] = useState(0);
+  const [lastHitHint, setLastHitHint] = useState<{
+    speedMs: number;
+    accuracy: number;
+    elbowAngle: number;
+    fixed: boolean;
+  } | null>(null);
+  const lastHitHintRef = useRef(lastHitHint);
+  lastHitHintRef.current = lastHitHint;
   const repsRef = useRef(0);
   const lastCoachRef = useRef(0);
   const fatigueSpokenRef = useRef(false);
@@ -63,6 +92,9 @@ export default function TrainingScreen() {
   const updateKinematics = useAppStore((s) => s.updateKinematics);
   const pushSample = useAppStore((s) => s.pushSample);
   const setPhase = useAppStore((s) => s.setPhase);
+  const patchProfileHeight = useAppStore((s) => s.patchProfileHeight);
+  const cameraCalibration = useAppStore((s) => s.cameraCalibration);
+  const ensureCameraCalibration = useAppStore((s) => s.ensureCameraCalibration);
 
   const drillCommands = useMemo(
     () => drillForSport(selectedSport) ?? [],
@@ -71,22 +103,88 @@ export default function TrainingScreen() {
   const isDrillSport = drillCommands.length > 0;
   const drill = useSportDrill(drillCommands);
 
-  const { cameraStatus, cameraError } = useCamera(videoRef, true);
+  const { cameraStatus, cameraError, canSwitch } = useCameraDevice(
+    videoRef,
+    true,
+    cameraFacing
+  );
   const { tick, poseReady, poseError } = usePoseTracker(videoRef, true);
+  const tickRef = useRef(tick);
+  const profileRef = useRef(profile);
+  const cameraCalibRef = useRef(cameraCalibration);
+  const drillRef = useRef(drill);
+  tickRef.current = tick;
+  profileRef.current = profile;
+  cameraCalibRef.current = cameraCalibration;
+  drillRef.current = drill;
 
   useEffect(() => {
     resetVbtState();
     resetRepCounter();
     resetFormScore();
+    resetEliteSession();
+    resetSessionVideoClips();
+    resetDistanceSmoother();
+    ensureCameraCalibration();
     fatigueSpokenRef.current = false;
     return () => stopSpeaking();
-  }, []);
+  }, [ensureCameraCalibration]);
+
+  useSessionVideoCapture(videoRef, {
+    sport: selectedSport,
+    exercise: selectedExercise,
+    countdownDone,
+    isDrillSport,
+    drillPhase: drill.phase,
+    drillCommand: drill.command,
+    lastHitHintRef,
+  });
+
+  const drillAutoStartedRef = useRef(false);
+  const analysisAutoRef = useRef(false);
+  const [autoAnalyzeSec, setAutoAnalyzeSec] = useState<number | null>(null);
+  const [detectedHeightCm, setDetectedHeightCm] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isDrillSport && countdownDone && !drill.started) {
+    if (
+      isDrillSport &&
+      countdownDone &&
+      !drill.started &&
+      !drillAutoStartedRef.current
+    ) {
+      drillAutoStartedRef.current = true;
       drill.start();
     }
   }, [isDrillSport, countdownDone, drill.started, drill.start]);
+
+  useEffect(() => {
+    if (!isDrillSport || drill.phase !== "complete" || analysisAutoRef.current) {
+      if (drill.phase !== "complete") {
+        setAutoAnalyzeSec(null);
+      }
+      return;
+    }
+
+    setAutoAnalyzeSec(3);
+    speakGuidance(
+      "drill:auto-analysis",
+      "Открываю анализ через три секунды",
+      { cooldownMs: 5000 }
+    );
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    timers.push(setTimeout(() => setAutoAnalyzeSec(2), 1000));
+    timers.push(setTimeout(() => setAutoAnalyzeSec(1), 2000));
+    timers.push(
+      setTimeout(() => {
+        analysisAutoRef.current = true;
+        setAutoAnalyzeSec(null);
+        setPhase("analysis");
+      }, 3000)
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [isDrillSport, drill.phase, setPhase]);
 
   useEffect(() => {
     if (!sessionStartTime || !countdownDone) return;
@@ -130,17 +228,64 @@ export default function TrainingScreen() {
     [selectedSport]
   );
 
+  const ready = cameraStatus === "ready" && poseReady && !poseError;
+  const trackingActive = isDrillSport ? drill.isTracking : countdownDone;
+  const showSetup = ready && !setupDone && !countdownDone;
+  const showSetupRef = useRef(false);
+  const heightScanFrameRef = useRef(0);
+  const detectedHeightRef = useRef<number | null>(null);
+  showSetupRef.current = showSetup;
+
+  const finishSetup = useCallback(() => setSetupDone(true), []);
+  const finishCountdown = useCallback(() => setCountdownDone(true), []);
+
   useEffect(() => {
-    if (!countdownDone) return;
+    if (!ready) return;
     let raf: number;
+    let frame = 0;
     const loop = () => {
-      const lm = tick();
-      if (lm && profile) {
-        setLandmarks(lm);
-        const k = computeKinematics(lm, selectedSport, profile.height);
+      const lm = tickRef.current();
+      if (lm) {
+        landmarksRef.current = lm;
+        frame += 1;
+        if (frame % 4 === 0) {
+          setLandmarks(lm);
+        }
+
+        if (showSetupRef.current) {
+          heightScanFrameRef.current += 1;
+          if (heightScanFrameRef.current % 24 === 0) {
+            const cal =
+              cameraCalibRef.current ??
+              useAppStore.getState().cameraCalibration;
+            const baseHeight = profileRef.current?.height ?? 182;
+            const dist = estimateDistanceMeters(
+              lm,
+              baseHeight,
+              "laptop",
+              cal,
+              true
+            )?.meters;
+            const est = estimateHeightFromPose(lm, dist, cal);
+            if (est && est.confidence === "high") {
+              patchProfileHeight(est.heightCm);
+              if (detectedHeightRef.current !== est.heightCm) {
+                detectedHeightRef.current = est.heightCm;
+                setDetectedHeightCm(est.heightCm);
+              }
+            }
+          }
+        }
+      }
+
+      const profileNow = profileRef.current;
+      const drillNow = drillRef.current;
+
+      if (lm && profileNow && countdownDone) {
+        const k = computeKinematics(lm, selectedSport, profileNow.height);
         updateKinematics(k);
 
-        const tracking = !isDrillSport || drill.isTracking;
+        const tracking = !isDrillSport || drillNow.isTracking;
 
         if (tracking) {
           pushSample({
@@ -170,12 +315,12 @@ export default function TrainingScreen() {
           const hint = coachForExercise(
             selectedExercise,
             k,
-            profile.injuries ?? ""
+            profileNow.injuries ?? ""
           );
           if (hint) coach(hint);
         }
 
-        if (selectedSport === "boxing" && drill.isTracking) {
+        if (selectedSport === "boxing" && drillNow.isTracking) {
           const speed = detectDrillStrike(
             k.punchSpeedMs,
             k.wristVelocityMs,
@@ -183,16 +328,43 @@ export default function TrainingScreen() {
           );
           if (speed != null) {
             flashStrike(speed, lm);
-            const hitForm = computeFormScore(selectedSport, selectedExercise, k);
-            drill.reportHit({
+            const features = kinematicsToFeatures(k, lm);
+            const elite = computeEliteScore(
+              features,
+              drillNow.command?.type ?? "jab",
+              "boxing"
+            );
+            const validation = validateDrillHit(
+              drillNow.command?.type ?? "jab",
+              "boxing",
+              k,
+              features,
+              elite,
+              speed
+            );
+            const hint = {
               speedMs: speed,
-              accuracy: hitForm,
+              accuracy: validation.accuracy,
               elbowAngle: k.elbowAngle,
-            });
+              fixed: validation.valid && speed >= 2.2 && validation.accuracy >= 52,
+              valid: validation.valid,
+              rejectionReason: validation.valid ? undefined : validation.reason,
+              eliteOverall: validation.valid ? elite.overall : undefined,
+              eliteTechnique: elite.techniqueVsElite,
+              eliteActionMatch: elite.actionMatch,
+              eliteDeviations: elite.deviations,
+            };
+            if (validation.valid) {
+              pushEliteSample(elite);
+              setEliteScore(elite.overall);
+            }
+            lastHitHintRef.current = hint;
+            setLastHitHint(hint);
+            drillNow.reportHit(hint);
           }
         }
 
-        if (selectedSport === "tennis" && drill.isTracking) {
+        if (selectedSport === "tennis" && drillNow.isTracking) {
           const speed = detectDrillSwing(
             k.wristVelocityMs,
             k.spineFlexion,
@@ -200,12 +372,39 @@ export default function TrainingScreen() {
           );
           if (speed != null) {
             flashStrike(speed, lm);
-            const hitForm = computeFormScore(selectedSport, selectedExercise, k);
-            drill.reportHit({
+            const features = kinematicsToFeatures(k, lm);
+            const elite = computeEliteScore(
+              features,
+              drillNow.command?.type ?? "forehand",
+              "tennis"
+            );
+            const validation = validateDrillHit(
+              drillNow.command?.type ?? "forehand",
+              "tennis",
+              k,
+              features,
+              elite,
+              speed
+            );
+            const hint = {
               speedMs: speed,
-              accuracy: hitForm,
+              accuracy: validation.accuracy,
               elbowAngle: k.elbowAngle,
-            });
+              fixed: validation.valid && speed >= 2.0 && validation.accuracy >= 50,
+              valid: validation.valid,
+              rejectionReason: validation.valid ? undefined : validation.reason,
+              eliteOverall: validation.valid ? elite.overall : undefined,
+              eliteTechnique: elite.techniqueVsElite,
+              eliteActionMatch: elite.actionMatch,
+              eliteDeviations: elite.deviations,
+            };
+            if (validation.valid) {
+              pushEliteSample(elite);
+              setEliteScore(elite.overall);
+            }
+            lastHitHintRef.current = hint;
+            setLastHitHint(hint);
+            drillNow.reportHit(hint);
           }
         }
 
@@ -223,18 +422,16 @@ export default function TrainingScreen() {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [
+    ready,
     countdownDone,
-    tick,
-    profile,
     selectedSport,
     selectedExercise,
+    isDrillSport,
     updateKinematics,
     pushSample,
     coach,
     flashStrike,
-    isDrillSport,
-    drill.isTracking,
-    drill.reportHit,
+    patchProfileHeight,
   ]);
 
   const sportLabel =
@@ -242,8 +439,25 @@ export default function TrainingScreen() {
       ? exerciseLabel(selectedExercise)
       : selectedSport;
 
-  const ready = cameraStatus === "ready" && poseReady && !poseError;
-  const trackingActive = isDrillSport ? drill.isTracking : countdownDone;
+  const coachContext: CoachContext | null = useMemo(() => {
+    if (!ready) return null;
+    if (showSetup) return null;
+    if (countdownDone) {
+      return {
+        mode: "training",
+        sport: selectedSport,
+        exercise: selectedExercise,
+      };
+    }
+    return null;
+  }, [
+    ready,
+    showSetup,
+    countdownDone,
+    selectedSport,
+    selectedExercise,
+  ]);
+
   const criticalMeshes = useMemo(
     () =>
       criticalMusclesFromLive(
@@ -253,25 +467,31 @@ export default function TrainingScreen() {
       ),
     [selectedSport, selectedExercise, formScore]
   );
-  const autoFrameVoice =
-    ready &&
-    (!isDrillSport ||
-      drill.phase === "active" ||
-      drill.phase === "rest" ||
-      drill.phase === "complete");
 
   return (
     <div className="flex min-h-dvh flex-col bg-background lg:flex-row">
       {/* Левая часть: камера + HUD */}
       <div className="relative flex min-h-[55vh] flex-1 flex-col lg:min-h-dvh lg:max-w-[58%]">
         <div className="relative flex-1 overflow-hidden rounded-b-2xl border-b border-[var(--primary)]/20 bg-background-secondary shadow-inner lg:rounded-none lg:border-b-0 lg:border-r">
-          <AutoFrameViewport
+          <CoachCameraViewport
             videoRef={videoRef}
             landmarks={landmarks}
-            active={ready}
-            sport={selectedSport}
-            voiceNudges={autoFrameVoice}
+            mirror={cameraFacing === "user"}
+            coachContext={coachContext}
+            coachActive={ready && countdownDone}
+            voiceCoach={
+              countdownDone && isDrillSport && drill.phase === "active"
+            }
+            heightCm={profile?.height}
+            cameraCalibration={cameraCalibration ?? undefined}
           >
+            <CameraFacingToggle
+              facing={cameraFacing}
+              canSwitch={canSwitch}
+              onToggle={() =>
+                setCameraFacing((f) => (f === "user" ? "environment" : "user"))
+              }
+            />
             <LiveScanGrid active={isDrillSport && drill.isTracking} />
             {(selectedSport === "boxing" || selectedSport === "tennis") &&
               trackingActive && (
@@ -292,7 +512,7 @@ export default function TrainingScreen() {
                   }`}
                 />
               )}
-          </AutoFrameViewport>
+          </CoachCameraViewport>
 
           <CameraStatusOverlay
             cameraStatus={cameraStatus}
@@ -301,8 +521,20 @@ export default function TrainingScreen() {
             poseError={poseError}
           />
 
-          {ready && !countdownDone && (
-            <CountdownOverlay onComplete={() => setCountdownDone(true)} />
+          {showSetup && (
+            <SilhouetteSetupGate
+              sport={selectedSport}
+              exercise={selectedExercise}
+              landmarksRef={landmarksRef}
+              active
+              heightCm={profile?.height ?? 182}
+              onReady={finishSetup}
+              onSkip={finishSetup}
+            />
+          )}
+
+          {ready && setupDone && !countdownDone && (
+            <CountdownOverlay onComplete={finishCountdown} />
           )}
           {resting && (
             <RestTimerOverlay
@@ -319,6 +551,7 @@ export default function TrainingScreen() {
               exercise={selectedExercise}
               reps={reps}
               formScore={formScore}
+              eliteScore={eliteScore}
               elapsedSec={elapsedSec}
               strikeLabel={drill.command?.text}
               lastStrikeSpeed={lastStrikeSpeed}
@@ -336,7 +569,7 @@ export default function TrainingScreen() {
               activeSecLeft={drill.activeSecLeft}
               fixationText={drill.fixationText}
               fixedCount={drill.fixedCount}
-              onAnalyze={() => setPhase("analysis")}
+              autoAnalyzeSec={autoAnalyzeSec}
             />
           )}
 

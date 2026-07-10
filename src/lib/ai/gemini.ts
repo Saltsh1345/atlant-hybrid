@@ -5,7 +5,7 @@ import {
 } from "@/lib/ai/geminiModels";
 
 const ANALYSIS_DEADLINE_MS = Number(
-  process.env.GEMINI_ANALYSIS_TIMEOUT_MS ?? 45000
+  process.env.GEMINI_ANALYSIS_TIMEOUT_MS ?? 90000
 );
 
 const SYSTEM_INSTRUCTION = `Ты — биомеханик и тренер по технике Atlant-Hybrid (бокс, теннис, силовые).
@@ -63,7 +63,7 @@ function sportBiomechHints(sport: string, exercise?: string): string {
   return `Биомеханика силовых — разбери: ${ex}. Цель: техника и рабочая скорость повтора.`;
 }
 
-type AnalysisPayload = {
+export type AnalysisPayload = {
   sport: string;
   exercise?: string;
   durationSec: number;

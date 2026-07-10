@@ -1,4 +1,7 @@
 import type { NormalizedLandmark, UserProfile } from "@/types";
+import type { BodyAnthropometrics } from "@/lib/bio/anthropometry";
+import type { BodyBioSignature } from "@/lib/bio/bodySignature";
+import type { ScanViewKey } from "@/lib/bio/captureScanFrame";
 import { LM, angle, dist } from "@/lib/pose/landmarks";
 
 export interface BodyScanSample {
@@ -18,7 +21,7 @@ export interface BodyScanSample {
 }
 
 export interface BodyScanJson {
-  version: 1;
+  version: 1 | 2;
   capturedAt: string;
   profile: {
     height: number;
@@ -41,6 +44,11 @@ export interface BodyScanJson {
     upperVisibility: number;
     lowerVisibility: number;
   };
+  /** v2 — measured dimensions from pose (cm). */
+  anthropometrics?: BodyAnthropometrics;
+  bioSignature?: BodyBioSignature;
+  views?: ScanViewKey[];
+  keyframeCount?: number;
 }
 
 function vis(lm: NormalizedLandmark): number {
@@ -124,7 +132,7 @@ export function buildBodyScanJson(
   const phases = [...new Set(samples.map((s) => s.phase))];
 
   return {
-    version: 1,
+    version: 2,
     capturedAt: new Date().toISOString(),
     profile: {
       height: profile.height,
@@ -149,5 +157,24 @@ export function buildBodyScanJson(
       upperVisibility: avg((s) => s.upperVisible),
       lowerVisibility: avg((s) => s.lowerVisible),
     },
+  };
+}
+
+export function enrichBodyScanJson(
+  scan: BodyScanJson,
+  extras: {
+    anthropometrics?: BodyAnthropometrics | null;
+    bioSignature?: BodyBioSignature | null;
+    views?: ScanViewKey[];
+    keyframeCount?: number;
+  }
+): BodyScanJson {
+  return {
+    ...scan,
+    version: 2,
+    anthropometrics: extras.anthropometrics ?? scan.anthropometrics,
+    bioSignature: extras.bioSignature ?? scan.bioSignature,
+    views: extras.views ?? scan.views,
+    keyframeCount: extras.keyframeCount ?? scan.keyframeCount,
   };
 }

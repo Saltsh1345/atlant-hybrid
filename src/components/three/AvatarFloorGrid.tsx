@@ -7,9 +7,11 @@ import * as THREE from "three";
 /** Floor under hologram twin — dark + thin cyan ring like reference */
 export default function AvatarFloorGrid({
   pulse = false,
+  subtle = false,
 }: {
   lightTheme?: boolean;
   pulse?: boolean;
+  subtle?: boolean;
 }) {
   const matRef = useRef<THREE.MeshBasicMaterial>(null);
 
@@ -22,12 +24,12 @@ export default function AvatarFloorGrid({
     if (Array.isArray(mats)) {
       mats.forEach((m) => {
         m.transparent = true;
-        m.opacity = 0.35;
+        m.opacity = subtle ? 0.12 : 0.35;
         m.depthWrite = false;
       });
     } else {
       mats.transparent = true;
-      mats.opacity = 0.35;
+      mats.opacity = subtle ? 0.12 : 0.35;
       mats.depthWrite = false;
     }
     return g;
@@ -36,10 +38,29 @@ export default function AvatarFloorGrid({
   useFrame(({ clock }) => {
     if (!matRef.current) return;
     const t = clock.getElapsedTime();
+    if (subtle) {
+      matRef.current.opacity = 0.03 + Math.sin(t * 0.7) * 0.015;
+      return;
+    }
     matRef.current.opacity = pulse
       ? 0.08 + Math.sin(t * 1.2) * 0.04
       : 0.07 + Math.sin(t * 0.7) * 0.02;
   });
+
+  if (subtle) {
+    return (
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
+        <ringGeometry args={[0.95, 1.02, 64]} />
+        <meshBasicMaterial
+          color="#67e8f9"
+          transparent
+          opacity={0.35}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+    );
+  }
 
   return (
     <group>

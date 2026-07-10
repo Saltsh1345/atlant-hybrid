@@ -1,8 +1,9 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import Button from "@/components/ui/Button";
 import type { DrillCommand, DrillPhase } from "@/lib/training/drillProtocol";
+
+const AUTO_ANALYSIS_SEC = 3;
 
 export default function SportDrillOverlay({
   phase,
@@ -13,7 +14,7 @@ export default function SportDrillOverlay({
   activeSecLeft,
   fixationText,
   fixedCount,
-  onAnalyze,
+  autoAnalyzeSec,
 }: {
   phase: DrillPhase;
   command: DrillCommand | null;
@@ -23,7 +24,8 @@ export default function SportDrillOverlay({
   activeSecLeft: number;
   fixationText: string;
   fixedCount: number;
-  onAnalyze?: () => void;
+  /** Seconds until analysis opens automatically (hands-free). */
+  autoAnalyzeSec?: number | null;
 }) {
   if (phase === "complete") {
     return (
@@ -33,11 +35,14 @@ export default function SportDrillOverlay({
           <p className="mt-2 text-sm text-slate-600">
             Зафиксировано ударов: {fixedCount} / {totalCommands}
           </p>
-          {onAnalyze && (
-            <Button size="lg" className="mt-4" onClick={onAnalyze}>
-              Анализ и план тренировки
-            </Button>
-          )}
+          {autoAnalyzeSec != null && autoAnalyzeSec > 0 ? (
+            <p className="mt-4 text-4xl font-black text-cyan-600">{autoAnalyzeSec}</p>
+          ) : null}
+          <p className="mt-2 text-sm font-medium text-slate-700">
+            {autoAnalyzeSec != null && autoAnalyzeSec > 0
+              ? "Анализ откроется автоматически"
+              : "Открываю анализ…"}
+          </p>
         </div>
       </div>
     );
@@ -81,12 +86,22 @@ export default function SportDrillOverlay({
                   {activeSecLeft}с
                 </p>
                 <p className="mt-1 text-xs text-orange-600">
-                  Резкий удар — камера зафиксирует скорость и точность
+                  Резкий удар по команде — мах рукой не засчитывается
                 </p>
               </>
             )}
             {fixationText && (
-              <p className="mt-2 text-sm font-semibold text-emerald-600">
+              <p
+                className={`mt-2 text-sm font-semibold ${
+                  fixationText.includes("Размах") ||
+                  fixationText.includes("Не ") ||
+                  fixationText.includes("не похож") ||
+                  fixationText.includes("не засчитан") ||
+                  fixationText.includes("Слишком")
+                    ? "text-warning"
+                    : "text-emerald-600"
+                }`}
+              >
                 {fixationText}
               </p>
             )}

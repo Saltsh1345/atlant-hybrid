@@ -7,8 +7,6 @@ import {
   releasePoseLandmarker,
 } from "@/lib/pose/mediapipePose";
 
-export type CameraStatus = "loading" | "ready" | "error";
-
 export function usePoseTracker(
   videoRef: React.RefObject<HTMLVideoElement | null>,
   enabled: boolean
@@ -70,59 +68,5 @@ export function usePoseTracker(
   return { tick, poseReady, poseError };
 }
 
-export function useCamera(
-  videoRef: React.RefObject<HTMLVideoElement | null>,
-  active: boolean
-) {
-  const [cameraStatus, setCameraStatus] = useState<CameraStatus>("loading");
-  const [cameraError, setCameraError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!active) return;
-    let stream: MediaStream | null = null;
-    let cancelled = false;
-    setCameraStatus("loading");
-    setCameraError(null);
-
-    (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        const v = videoRef.current;
-        if (v) {
-          v.srcObject = stream;
-          v.playsInline = true;
-          v.muted = true;
-          await v.play();
-          setCameraStatus("ready");
-        }
-      } catch {
-        if (!cancelled) {
-          setCameraStatus("error");
-          setCameraError(
-            "Нет доступа к камере. Разрешите камеру в настройках браузера."
-          );
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      stream?.getTracks().forEach((t) => t.stop());
-      const v = videoRef.current;
-      if (v) v.srcObject = null;
-    };
-  }, [active, videoRef]);
-
-  return { cameraStatus, cameraError };
-}
+export { useCamera, useCameraDevice } from "@/hooks/useCameraDevice";
+export type { CameraStatus } from "@/hooks/useCameraDevice";

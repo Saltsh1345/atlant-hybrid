@@ -9,6 +9,9 @@ import ApexSportSelect from "@/components/dashboard/ApexSportSelect";
 import ApexTwinScanPanel, {
   type SensorChip,
 } from "@/components/dashboard/ApexTwinScanPanel";
+import VideoDiagnosticsPanel from "@/components/dashboard/VideoDiagnosticsPanel";
+import TrainingProgramPanel from "@/components/dashboard/TrainingProgramPanel";
+import { getTodayTrainingDay } from "@/lib/training/programEngine";
 import { useAppStore } from "@/store/useAppStore";
 import { useDashboardLayoutStore } from "@/store/useDashboardLayoutStore";
 import { computeMuscleReadiness } from "@/lib/readiness";
@@ -28,6 +31,10 @@ export default function DashboardScreen() {
   const healthConnected = useAppStore((s) => s.healthConnected);
   const healthReadiness = useAppStore((s) => s.healthReadiness);
   const refreshHealthReadiness = useAppStore((s) => s.refreshHealthReadiness);
+  const diagnosticReport = useAppStore((s) => s.diagnosticReport);
+  const trainingProgram = useAppStore((s) => s.trainingProgram);
+  const exerciseLogs = useAppStore((s) => s.exerciseLogs);
+  const refreshVideoDiagnostics = useAppStore((s) => s.refreshVideoDiagnostics);
 
   const focusSportPicker = useDashboardLayoutStore((s) => s.focusSportPicker);
   const setFocusSportPicker = useDashboardLayoutStore(
@@ -42,6 +49,12 @@ export default function DashboardScreen() {
   useEffect(() => {
     void refreshHealthReadiness();
   }, [refreshHealthReadiness]);
+
+  useEffect(() => {
+    if (latchedBody || sessionHistory.length > 0) {
+      refreshVideoDiagnostics();
+    }
+  }, [latchedBody, sessionHistory.length, refreshVideoDiagnostics]);
 
   useEffect(() => {
     fetch("/api/gemini/status")
@@ -173,6 +186,14 @@ export default function DashboardScreen() {
         status: healthConnected ? "ok" : "off",
       },
       {
+        id: "diagnostics",
+        label: "Видеодиагностика",
+        detail: diagnosticReport
+          ? `Слабых зон: ${diagnosticReport.weakZones.length} · ${diagnosticReport.overallScore}/100`
+          : "Нужен скан + тренировка",
+        status: diagnosticReport ? "ok" : "warn",
+      },
+      {
         id: "ai",
         label: "Gemini AI",
         detail:
@@ -191,6 +212,7 @@ export default function DashboardScreen() {
     healthConnected,
     healthReadiness,
     geminiOk,
+    diagnosticReport,
   ]);
 
   const startTraining = useCallback(
@@ -220,6 +242,30 @@ export default function DashboardScreen() {
     }
     setPhase("twin-live");
   }, [bodyDataLocked, goToScan, setPhase]);
+
+  const startTodayProgram = useCallback(() => {
+    const day = getTodayTrainingDay(trainingProgram);
+    const block = day?.blocks[0];
+    if (!block) {
+      logWorkout();
+      return;
+    }
+    void goToTraining(block.sport, block.strengthExercise);
+  }, [trainingProgram, logWorkout]);
+
+  const diagnosticsBlock = (
+    <div className="mb-5 grid gap-4 lg:grid-cols-2">
+      <VideoDiagnosticsPanel
+        report={diagnosticReport}
+        onOpenTwin={bodyDataLocked ? openTwinLive : undefined}
+      />
+      <TrainingProgramPanel
+        program={trainingProgram}
+        exerciseLogs={exerciseLogs}
+        onStartToday={startTodayProgram}
+      />
+    </div>
+  );
 
   const handleNav = (phase: AppPhase) => {
     if (phase === "calibration") {
@@ -301,6 +347,7 @@ export default function DashboardScreen() {
             </button>
           </div>
         </header>
+        {diagnosticsBlock}
         <ApexOverview
           overview={overview}
           sportSelect={sportSelect}
@@ -318,6 +365,7 @@ export default function DashboardScreen() {
           onNav={handleNav}
           onLogWorkout={logWorkout}
         >
+          {diagnosticsBlock}
           <ApexOverview
             overview={overview}
             sportSelect={sportSelect}

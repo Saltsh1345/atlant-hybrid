@@ -1,9 +1,8 @@
 "use client";
 
-import { CALIBRATION_SCRIPT } from "@/lib/calibration/script";
+import { getCalibrationScript } from "@/lib/calibration/script";
+import { detectDeviceKind } from "@/lib/camera/deviceProfile";
 import type { CalibrationStep } from "@/types";
-
-const STEPS = CALIBRATION_SCRIPT.map((s) => s.step);
 
 export default function CalibrationProgress({
   current,
@@ -11,8 +10,9 @@ export default function CalibrationProgress({
   current: CalibrationStep;
 }) {
   if (current === "idle") return null;
-  const idx = STEPS.indexOf(current);
-  const pct = idx < 0 ? 0 : Math.round(((idx + 1) / STEPS.length) * 100);
+  const steps = getCalibrationScript(detectDeviceKind()).map((s) => s.step);
+  const idx = steps.indexOf(current);
+  const pct = idx < 0 ? 0 : Math.round(((idx + 1) / steps.length) * 100);
 
   return (
     <div className="mb-3">

@@ -1,3 +1,4 @@
+import { defaultFatZones } from "@/lib/body/fatZones";
 import type { LatchedBodyData, UserProfile } from "@/types";
 import type { ScanAnalysis } from "@/lib/calibration/scanAnalysis";
 
@@ -40,13 +41,21 @@ export function simulateBodyComposition(
     scanNote = "Скан при неполной видимости тела — оценка приблизительная";
   }
 
+  const roundedFat = Math.round(fatPercent * 10) / 10;
+
   return {
-    fatPercent: Math.round(fatPercent * 10) / 10,
+    fatPercent: roundedFat,
     musclePercent: Math.round(musclePercent * 10) / 10,
     leanMassKg: Math.round(leanMassKg * 10) / 10,
     fatMassKg: Math.round(fatMassKg * 10) / 10,
+    totalWeightKg: Math.round(profile.weight * 10) / 10,
+    heightCm: profile.height,
+    heightSource: "profile",
     lockedAt: new Date().toISOString(),
     clothingDetected: scan?.clothingLikely ?? false,
+    clothingReason: scanNote,
     scanNote,
+    fatZones: defaultFatZones(roundedFat),
+    source: "local",
   };
 }

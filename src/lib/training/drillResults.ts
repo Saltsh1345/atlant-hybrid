@@ -6,6 +6,10 @@ export interface DrillFixation {
   accuracy: number;
   elbowAngle: number;
   fixed: boolean;
+  eliteOverall?: number;
+  eliteTechnique?: number;
+  eliteActionMatch?: number;
+  eliteDeviations?: string[];
 }
 
 const fixations: DrillFixation[] = [];
@@ -27,10 +31,14 @@ export function drillSummary(): {
   fixed: number;
   avgSpeed: number;
   avgAccuracy: number;
+  avgEliteOverall: number;
 } {
   const fixed = fixations.filter((f) => f.fixed);
   const speeds = fixed.map((f) => f.speedMs);
   const accs = fixed.map((f) => f.accuracy);
+  const elites = fixations
+    .map((f) => f.eliteOverall)
+    .filter((v): v is number => v != null && v > 0);
   return {
     total: fixations.length,
     fixed: fixed.length,
@@ -42,6 +50,10 @@ export function drillSummary(): {
     avgAccuracy:
       accs.length > 0
         ? Math.round(accs.reduce((a, b) => a + b, 0) / accs.length)
+        : 0,
+    avgEliteOverall:
+      elites.length > 0
+        ? Math.round(elites.reduce((a, b) => a + b, 0) / elites.length)
         : 0,
   };
 }

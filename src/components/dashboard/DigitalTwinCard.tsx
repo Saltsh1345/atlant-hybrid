@@ -78,7 +78,7 @@ export default function DigitalTwinCard({
       )}
 
       {showTwin ? (
-        <div className="min-h-0 flex-1">
+        <div className="relative z-[1] mb-4 shrink-0">
           <BiomechTwinPanel
             latchedBody={latchedBody}
             locked={!!locked}
@@ -86,7 +86,7 @@ export default function DigitalTwinCard({
             tall
             showHud
             calm={calm}
-            className="h-full min-h-[220px]"
+            className="h-[min(400px,44vh)] w-full"
           />
         </div>
       ) : (
@@ -96,7 +96,21 @@ export default function DigitalTwinCard({
       )}
 
       {locked ? (
-        <div className="relative z-[1] mt-4 grid grid-cols-3 gap-2">
+        <div className="relative z-[1] mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-xl border border-slate-600/30 bg-slate-900/50 px-2 py-2 text-center">
+            <p className="text-[9px] uppercase text-muted">Вес</p>
+            <p className="text-lg font-bold text-foreground">
+              {latchedBody.totalWeightKg ?? "—"}
+            </p>
+            <p className="text-[10px] text-muted">кг</p>
+          </div>
+          <div className="rounded-xl border border-slate-600/30 bg-slate-900/50 px-2 py-2 text-center">
+            <p className="text-[9px] uppercase text-muted">Рост</p>
+            <p className="text-lg font-bold text-foreground">
+              {latchedBody.heightCm ?? "—"}
+            </p>
+            <p className="text-[10px] text-muted">см</p>
+          </div>
           <div className="rounded-xl border border-[var(--warning)]/30 bg-[var(--readiness-muted)] px-2 py-2 text-center">
             <p className="text-[9px] uppercase text-readiness">Жир</p>
             <p className="text-lg font-bold text-readiness">
@@ -105,14 +119,8 @@ export default function DigitalTwinCard({
             <p className="text-[10px] text-muted">{latchedBody.fatMassKg} кг</p>
           </div>
           <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-muted)] px-2 py-2 text-center">
-            <p className="text-[9px] uppercase text-success">Мышцы</p>
+            <p className="text-[9px] uppercase text-success">Сухая масса</p>
             <p className="text-lg font-bold text-success">
-              {latchedBody.musclePercent}%
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--primary)]/30 bg-[var(--primary-muted)] px-2 py-2 text-center">
-            <p className="text-[9px] uppercase text-primary">Сухая масса</p>
-            <p className="text-lg font-bold text-primary">
               {latchedBody.leanMassKg}
             </p>
             <p className="text-[10px] text-muted">кг</p>
@@ -122,7 +130,7 @@ export default function DigitalTwinCard({
 
       {locked && latchedBody?.clothingDetected && (
         <p className="relative z-[1] mt-2 text-[10px] text-warning">
-          Одежда учтена — оценка приблизительная
+          {latchedBody.clothingReason ?? "Одежда учтена — оценка приблизительная"}
         </p>
       )}
 
