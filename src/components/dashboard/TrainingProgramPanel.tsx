@@ -6,6 +6,7 @@ import {
   getTodayTrainingDay,
   formatSetPlan,
 } from "@/lib/training/programEngine";
+import { CATEGORY_LABELS } from "@/lib/training/exerciseCatalog";
 import { totalSetsInHistory } from "@/lib/training/sessionLog";
 import Button from "@/components/ui/Button";
 
@@ -63,7 +64,22 @@ export default function TrainingProgramPanel({
             <div className="mt-3 space-y-3">
               {today.blocks.map((b) => (
                 <div key={b.exerciseId}>
-                  <p className="font-medium text-white">{b.name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-white">{b.name}</p>
+                    {b.category && (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-wide text-[#a3a3a3]">
+                        {CATEGORY_LABELS[b.category]}
+                      </span>
+                    )}
+                    {b.trackingMode === "pose" && (
+                      <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-[9px] uppercase text-cyan-300/80">
+                        камера
+                      </span>
+                    )}
+                  </div>
+                  {b.equipment && (
+                    <p className="text-[10px] text-[#737373]">{b.equipment}</p>
+                  )}
                   <p className="font-mono text-[11px] text-cyan-300/90">
                     {formatSetPlan(b.sets)}
                   </p>
@@ -92,7 +108,13 @@ export default function TrainingProgramPanel({
                 <span className="ml-2 text-[#737373]">отдых</span>
               ) : (
                 <span className="ml-2">
-                  {d.blocks.map((b) => b.name).join(" + ")}
+                  {d.blocks
+                    .map((b) =>
+                      b.category
+                        ? `${b.name} (${CATEGORY_LABELS[b.category]})`
+                        : b.name
+                    )
+                    .join(" + ")}
                 </span>
               )}
             </li>

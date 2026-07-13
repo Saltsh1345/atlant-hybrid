@@ -1,5 +1,16 @@
 import type { Sport, StrengthExercise } from "@/types";
 
+export type ExerciseCategory =
+  | "hypertrophy"
+  | "power"
+  | "core"
+  | "agility"
+  | "technique-drill";
+
+export type ExerciseDifficulty = "beginner" | "intermediate" | "advanced";
+
+export type ExerciseTrackingMode = "pose" | "guided";
+
 /** Один подход в плане. */
 export interface PlannedSet {
   reps: number;
@@ -19,6 +30,10 @@ export interface WorkoutBlock {
   targetMuscles: string[];
   /** Слабая зона, которую закрывает блок */
   weakZoneId?: string;
+  category?: ExerciseCategory;
+  equipment?: string;
+  description?: string;
+  trackingMode?: ExerciseTrackingMode;
 }
 
 export interface TrainingDay {

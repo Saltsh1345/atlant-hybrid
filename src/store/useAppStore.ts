@@ -17,6 +17,8 @@ import type { VideoDiagnosticReport, TrainingProgram, ExerciseLog } from "@/type
 import { computeMuscleReadiness } from "@/lib/readiness";
 import { runVideoDiagnostics } from "@/lib/diagnostics/videoDiagnostics";
 import { generateTrainingProgram } from "@/lib/training/programEngine";
+import { generateWorkoutPlan } from "@/lib/ai/workoutPlan";
+import type { WorkoutPlan } from "@/lib/ai/workoutPlan";
 import { buildExerciseLogFromSession } from "@/lib/training/sessionLog";
 import { canTransition, trackingModeForPhase } from "@/lib/stateMachine";
 import { defaultFatZones } from "@/lib/body/fatZones";
@@ -72,6 +74,7 @@ interface AppStore {
   /** Видеодиагностика слабых зон */
   diagnosticReport: VideoDiagnosticReport | null;
   trainingProgram: TrainingProgram | null;
+  workoutPlan: WorkoutPlan | null;
   exerciseLogs: ExerciseLog[];
 
   avatarMissing: boolean;
@@ -146,6 +149,7 @@ export const useAppStore = create<AppStore>()(
       sessionHistory: [],
       diagnosticReport: null,
       trainingProgram: null,
+      workoutPlan: null,
       exerciseLogs: [],
       avatarMissing: false,
       calibrationScriptIndex: 0,
@@ -315,8 +319,18 @@ export const useAppStore = create<AppStore>()(
           diagnostic: report,
           profile: p,
           readiness,
+          selectedSport: get().selectedSport,
+          sessionHistory: get().sessionHistory,
         });
-        set({ trainingProgram: program });
+        const workoutPlan = generateWorkoutPlan({
+          goal: p.goal,
+          readiness,
+          lastSport: get().lastSession?.sport,
+          lastExercise: get().lastSession?.exercise,
+          trainingProgram: program,
+          preferredSport: get().selectedSport,
+        });
+        set({ trainingProgram: program, workoutPlan });
         return program;
       },
 
@@ -379,6 +393,7 @@ export const useAppStore = create<AppStore>()(
           sessionHistory: [],
           diagnosticReport: null,
           trainingProgram: null,
+          workoutPlan: null,
           exerciseLogs: [],
           voiceMuted: false,
           healthReadiness: null,
@@ -403,6 +418,7 @@ export const useAppStore = create<AppStore>()(
         sessionHistory: s.sessionHistory,
         diagnosticReport: s.diagnosticReport,
         trainingProgram: s.trainingProgram,
+        workoutPlan: s.workoutPlan,
         exerciseLogs: s.exerciseLogs,
         voiceMuted: s.voiceMuted,
         healthReadiness: s.healthReadiness,
