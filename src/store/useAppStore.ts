@@ -169,7 +169,13 @@ export const useAppStore = create<AppStore>()(
         return true;
       },
 
-      setProfile: (profile) => set({ profile }),
+      setProfile: (profile) => {
+        set({ profile });
+        if (get().latchedBody || get().sessionHistory.length > 0) {
+          get().refreshVideoDiagnostics();
+          get().refreshTrainingProgram();
+        }
+      },
 
       patchProfileHeight: (heightCm) => {
         const clamped = Math.max(145, Math.min(205, Math.round(heightCm)));
@@ -221,8 +227,12 @@ export const useAppStore = create<AppStore>()(
         return data;
       },
 
-      setSelectedSport: (sport) =>
-        set({ selectedSport: sport, selectedExercise: null }),
+      setSelectedSport: (sport) => {
+        set({ selectedSport: sport, selectedExercise: null });
+        if (get().diagnosticReport) {
+          get().refreshTrainingProgram();
+        }
+      },
 
       setSelectedExercise: (exercise) => set({ selectedExercise: exercise }),
 
@@ -352,7 +362,13 @@ export const useAppStore = create<AppStore>()(
         }),
 
       unlockForRescan: () =>
-        set({ bodyDataLocked: false, latchedBody: null }),
+        set({
+          bodyDataLocked: false,
+          latchedBody: null,
+          diagnosticReport: null,
+          trainingProgram: null,
+          workoutPlan: null,
+        }),
 
       requestRescan: () => set({ rescanPending: true }),
 
@@ -386,9 +402,16 @@ export const useAppStore = create<AppStore>()(
         applyVoiceMuted(false);
         set({
           phase: "welcome",
+          calibrationStep: "idle",
+          trackingMode: "idle",
           profile: null,
           latchedBody: null,
           bodyDataLocked: false,
+          selectedSport: null,
+          selectedExercise: null,
+          kinematics: DEFAULT_KINEMATICS,
+          sessionSamples: [],
+          sessionStartTime: null,
           lastSession: null,
           sessionHistory: [],
           diagnosticReport: null,
@@ -398,6 +421,10 @@ export const useAppStore = create<AppStore>()(
           voiceMuted: false,
           healthReadiness: null,
           healthConnected: false,
+          cameraCalibration: null,
+          avatarMissing: false,
+          calibrationScriptIndex: 0,
+          rescanPending: false,
         });
       },
 
@@ -424,6 +451,7 @@ export const useAppStore = create<AppStore>()(
         healthReadiness: s.healthReadiness,
         healthConnected: s.healthConnected,
         cameraCalibration: s.cameraCalibration,
+        selectedSport: s.selectedSport,
         phase:
           s.phase === "training" ||
           s.phase === "settings" ||

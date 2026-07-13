@@ -167,12 +167,11 @@ function mergeWeakZones(zones: WeakZone[]): WeakZone[] {
   for (const z of zones) {
     const key = `${z.muscleGroup}-${z.side ?? "both"}`;
     const prev = byGroup.get(key);
-    if (!prev || z.severity > prev.severity) {
-      byGroup.set(key, {
-        ...z,
-        causes: [...new Set([...(prev?.causes ?? []), ...z.causes])].slice(0, 4),
-      });
-    }
+    const strongest = !prev || z.severity > prev.severity ? z : prev;
+    byGroup.set(key, {
+      ...strongest,
+      causes: [...new Set([...(prev?.causes ?? []), ...z.causes])].slice(0, 4),
+    });
   }
   return [...byGroup.values()].sort((a, b) => b.severity - a.severity);
 }

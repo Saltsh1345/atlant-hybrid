@@ -1,4 +1,4 @@
-import type { SessionSummary, Sport, StrengthExercise } from "@/types";
+import type { SessionSummary } from "@/types";
 import type { ExerciseLog, SetRecord } from "@/types/training";
 import { exerciseById } from "@/lib/training/exerciseCatalog";
 
@@ -19,9 +19,7 @@ export function buildExerciseLogFromSession(
         ? "tennis_drill"
         : "squat");
 
-  const def = exerciseById(
-    typeof exId === "string" ? exId : exId
-  );
+  const def = exerciseById(exId);
   const name = def?.name ?? String(exId);
 
   const setCount =

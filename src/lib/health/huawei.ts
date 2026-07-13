@@ -89,7 +89,19 @@ export async function refreshHuaweiToken(refreshToken: string): Promise<HuaweiTo
   return (await res.json()) as HuaweiTokenResponse;
 }
 
-async function callHealthApi(path: string, accessToken: string): Promise<any | null> {
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : {};
+}
+
+function recordArray(value: unknown): JsonRecord[] {
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+async function callHealthApi(path: string, accessToken: string): Promise<unknown | null> {
   const res = await fetch(`${HEALTH_BASE}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -99,8 +111,10 @@ async function callHealthApi(path: string, accessToken: string): Promise<any | n
 }
 
 function toIso(v: unknown): string {
-  if (typeof v === "number") return new Date(v).toISOString();
-  if (typeof v === "string") return new Date(v).toISOString();
+  if (typeof v === "number" || typeof v === "string") {
+    const date = new Date(v);
+    if (Number.isFinite(date.getTime())) return date.toISOString();
+  }
   return new Date().toISOString();
 }
 
@@ -119,13 +133,21 @@ export async function fetchHuaweiMetrics(
     callHealthApi(spo2Path, accessToken),
     callHealthApi(stressPath, accessToken),
   ]);
+  const sleep = asRecord(sleepRaw);
+  const heartRate = asRecord(hrRaw);
+  const spo2 = asRecord(spo2Raw);
+  const stress = asRecord(stressRaw);
 
-  const sleepRecords: any[] =
-    sleepRaw?.records ?? sleepRaw?.data ?? sleepRaw?.sleepRecords ?? [];
+  const sleepRecords = recordArray(
+    sleep.records ?? sleep.data ?? sleep.sleepRecords
+  );
   const lastSleep = sleepRecords[0];
-  const hrRecords: any[] = hrRaw?.records ?? hrRaw?.data ?? [];
+  const hrRecords = recordArray(heartRate.records ?? heartRate.data);
   const restingBpm =
-    hrRaw?.restingBpm ?? hrRaw?.restingHeartRate ?? hrRecords[0]?.restingBpm ?? null;
+    heartRate.restingBpm ??
+    heartRate.restingHeartRate ??
+    hrRecords[0]?.restingBpm ??
+    null;
 
   return {
     fetchedAt: new Date().toISOString(),
@@ -137,7 +159,7 @@ export async function fetchHuaweiMetrics(
             durationMin: Math.round(
               Number(lastSleep.durationMin ?? lastSleep.duration ?? 0)
             ),
-            phases: (lastSleep.phases ?? lastSleep.stage ?? []).map((p: any) => ({
+            phases: recordArray(lastSleep.phases ?? lastSleep.stage).map((p) => ({
               phase: String(p.phase ?? p.type ?? "unknown"),
               durationMin: Math.round(Number(p.durationMin ?? p.duration ?? 0)),
             })),
@@ -146,12 +168,12 @@ export async function fetchHuaweiMetrics(
     },
     heartRate: {
       restingBpm: restingBpm != null ? Number(restingBpm) : null,
-      points: hrRecords.slice(0, 1440).map((p: any) => ({
+      points: hrRecords.slice(0, 1440).map((p) => ({
         t: toIso(p.time ?? p.timestamp ?? p.t),
         bpm: Number(p.bpm ?? p.heartRate ?? 0),
       })),
     },
-    spo2: { latest: spo2Raw?.latest != null ? Number(spo2Raw.latest) : null },
-    stress: { latest: stressRaw?.latest != null ? Number(stressRaw.latest) : null },
+    spo2: { latest: spo2.latest != null ? Number(spo2.latest) : null },
+    stress: { latest: stress.latest != null ? Number(stress.latest) : null },
   };
 }

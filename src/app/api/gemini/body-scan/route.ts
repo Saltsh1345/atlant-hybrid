@@ -23,7 +23,10 @@ export async function POST(req: Request) {
       body.scan,
       body.keyframes
     );
-    const weight = body.weight ?? body.scan.profile.weight ?? 75;
+    const requestedWeight = Number(body.weight ?? body.scan.profile.weight);
+    const weight = Number.isFinite(requestedWeight)
+      ? Math.max(30, Math.min(300, requestedWeight))
+      : 75;
     const latched = toLatchedBody(result, weight, source, {
       anthropometrics: body.scan.anthropometrics,
       bioSignature: body.scan.bioSignature,
@@ -48,7 +51,7 @@ export async function POST(req: Request) {
         error: "Body scan analysis failed",
         reason: e instanceof Error ? e.message : "unknown",
       },
-      { status: 500 }
+      { status: e instanceof SyntaxError ? 400 : 500 }
     );
   }
 }

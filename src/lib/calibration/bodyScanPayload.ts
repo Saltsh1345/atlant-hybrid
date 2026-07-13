@@ -29,7 +29,7 @@ export interface BodyScanJson {
     age: number;
     goal: string;
   };
-  camera: "laptop_webcam";
+  camera: "laptop_webcam" | "mobile_camera";
   phases: string[];
   samples: BodyScanSample[];
   summary: {
@@ -114,16 +114,27 @@ export function pushBodyScanSample(
   samples: BodyScanSample[],
   landmarks: NormalizedLandmark[] | null,
   phase: string,
-  maxSamples = 80
+  maxSamples = 160
 ): void {
   if (!landmarks || landmarks.length < 29) return;
   samples.push(sampleFromLandmarks(landmarks, phase));
-  if (samples.length > maxSamples) samples.shift();
+  if (samples.length > maxSamples) {
+    const phaseCounts = new Map<string, number>();
+    for (const sample of samples) {
+      phaseCounts.set(sample.phase, (phaseCounts.get(sample.phase) ?? 0) + 1);
+    }
+    const mostCommonPhase = [...phaseCounts.entries()].sort(
+      (a, b) => b[1] - a[1]
+    )[0]?.[0];
+    const removeAt = samples.findIndex((sample) => sample.phase === mostCommonPhase);
+    samples.splice(removeAt >= 0 ? removeAt : 0, 1);
+  }
 }
 
 export function buildBodyScanJson(
   profile: UserProfile,
-  samples: BodyScanSample[]
+  samples: BodyScanSample[],
+  camera: BodyScanJson["camera"] = "laptop_webcam"
 ): BodyScanJson {
   const n = samples.length || 1;
   const avg = (fn: (s: BodyScanSample) => number) =>
@@ -140,7 +151,7 @@ export function buildBodyScanJson(
       age: profile.age,
       goal: profile.goal ?? "maintain",
     },
-    camera: "laptop_webcam",
+    camera,
     phases,
     samples,
     summary: {

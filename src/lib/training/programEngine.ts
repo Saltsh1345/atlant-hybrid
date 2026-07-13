@@ -262,11 +262,7 @@ export function generateTrainingProgram(opts: {
     const blocks = uniqueBlocks(weakBlock?.exerciseId, ...dayTemplate).map(
       (b) => {
         if (b.exerciseId === weakBlock?.exerciseId && weakBlock) {
-          return {
-            ...b,
-            weakZoneId: weakBlock.weakZoneId,
-            notes: weakBlock.notes,
-          };
+          return weakBlock;
         }
         return blockFromExercise(b.exerciseId, undefined, intensity) ?? b;
       }

@@ -36,7 +36,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Not connected" }, { status: 401 });
   }
 
-  const metrics = await fetchHuaweiMetrics(accessToken);
+  let metrics;
+  try {
+    metrics = await fetchHuaweiMetrics(accessToken);
+  } catch {
+    return NextResponse.json(
+      { error: "Huawei Health API unavailable" },
+      { status: 502 }
+    );
+  }
   const res = NextResponse.json({ metrics });
   if (refreshed) {
     res.cookies.set("huawei_access_token", refreshed.access_token, {

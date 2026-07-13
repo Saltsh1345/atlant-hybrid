@@ -61,6 +61,7 @@ import { speakScript, speakGuidance, speakLongText, stopSpeaking } from "@/lib/a
 import { estimateDistanceMeters } from "@/lib/camera/distanceEstimator";
 import { estimateHeightFromPose } from "@/lib/camera/heightEstimator";
 import { resetDistanceSmoother } from "@/lib/camera/distanceSmoother";
+import { simulateBodyComposition } from "@/lib/calibration/bodySimulator";
 import type { CalibrationStep, LatchedBodyData, NormalizedLandmark } from "@/types";
 
 export default function CalibrationScreen() {
@@ -87,6 +88,7 @@ export default function CalibrationScreen() {
   const clothingHitsRef = useRef(0);
   const clothingChecksRef = useRef(0);
   const [cameraFacing, setCameraFacing] = useState<CameraFacing>("user");
+  const cameraFacingRef = useRef<CameraFacing>("user");
   const deviceKind = detectDeviceKind();
   const mobileCaps = detectMobileCameraCapabilities();
   const isPhone = isMobileDevice();
@@ -104,7 +106,6 @@ export default function CalibrationScreen() {
   const setPhase = useAppStore((s) => s.setPhase);
   const setFocusSportPicker = useDashboardLayoutStore((s) => s.setFocusSportPicker);
   const latchBodyResult = useAppStore((s) => s.latchBodyResult);
-  const latchBodyData = useAppStore((s) => s.latchBodyData);
   const latchedBody = useAppStore((s) => s.latchedBody);
   const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
   const setCalibrationStep = useAppStore((s) => s.setCalibrationStep);
@@ -129,9 +130,6 @@ export default function CalibrationScreen() {
     resetCalibration();
     ensureCameraCalibration();
     resetDistanceSmoother();
-    setSetupDone(false);
-    setPhoneScanMode(isPhone ? null : "selfie");
-    setTripodReady(false);
     scanAutoStartedRef.current = false;
     const pending = useAppStore.getState().rescanPending;
     if (pending) {
@@ -143,7 +141,9 @@ export default function CalibrationScreen() {
   }, []);
 
   const tickRef = useRef(tick);
-  tickRef.current = tick;
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
 
   const tickClothingCheck = useCallback(() => {
     const lm = landmarksRef.current;
@@ -204,7 +204,8 @@ export default function CalibrationScreen() {
       },
       (feedback) => {
         const cooldown =
-          phoneScanMode === "tripod" && cameraFacing === "environment"
+          phoneScanMode === "tripod" &&
+          cameraFacingRef.current === "environment"
             ? 6000
             : 12000;
         speakGuidance(`cal:pose:${step}`, feedback, { cooldownMs: cooldown });
@@ -216,13 +217,14 @@ export default function CalibrationScreen() {
   };
 
   const sampleForDuration = async (step: CalibrationStep, ms: number) => {
-    const end = Date.now() + ms;
-    while (Date.now() < end) {
+    const intervalMs = 120;
+    const iterations = Math.max(1, Math.ceil(ms / intervalMs));
+    for (let i = 0; i < iterations; i++) {
       pushBodyScanSample(samplesRef.current, landmarksRef.current, step);
       setScanSampleCount(samplesRef.current.length);
       tickClothingCheck();
       captureKeyframe(step);
-      await new Promise((r) => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, intervalMs));
     }
   };
 
@@ -261,7 +263,11 @@ export default function CalibrationScreen() {
   const runGeminiAnalysis = async (): Promise<LatchedBodyData | null> => {
     const p = profile ?? ensureProfile();
     const cal = cameraCalibration ?? ensureCameraCalibration();
-    let scan = buildBodyScanJson(p, samplesRef.current);
+    let scan = buildBodyScanJson(
+      p,
+      samplesRef.current,
+      isPhone ? "mobile_camera" : "laptop_webcam"
+    );
 
     const bestLandmarks = landmarksRef.current;
     const stature = estimateStatureFromScan(bestLandmarks, p.height, cal);
@@ -382,15 +388,13 @@ export default function CalibrationScreen() {
       localScan.clothingLikely = true;
       localScan.clothingReason = clothingMerged.summary;
     }
-    const local = latchBodyData(localScan);
-    return local
-      ? applyClothingToResult({
-          ...local,
-          anthropometrics: anth ?? undefined,
-          bioSignature: sig ?? undefined,
-          scanQuality,
-        })
-      : null;
+    const local = simulateBodyComposition(p, localScan);
+    return applyClothingToResult({
+      ...local,
+      anthropometrics: anth ?? undefined,
+      bioSignature: sig ?? undefined,
+      scanQuality,
+    });
   };
 
   const runScript = useCallback(async () => {
@@ -413,7 +417,8 @@ export default function CalibrationScreen() {
     const script = getCalibrationScript(deviceKind, phoneScanMode ?? "selfie");
     setScanStepTotal(script.length);
     const voiceOnly =
-      phoneScanMode === "tripod" && cameraFacing === "environment";
+      phoneScanMode === "tripod" &&
+      cameraFacingRef.current === "environment";
 
     for (let si = 0; si < script.length; si++) {
       const line = script[si]!;
@@ -482,7 +487,6 @@ export default function CalibrationScreen() {
     setRunning(false);
   }, [
     running,
-    latchBodyData,
     latchBodyResult,
     setCalibrationStep,
     phoneScanMode,
@@ -553,6 +557,7 @@ export default function CalibrationScreen() {
   }, [setupDone, running, showComposition, runScript, isPhone]);
 
   const startTripodScan = useCallback(async () => {
+    cameraFacingRef.current = "environment";
     setCameraFacing("environment");
     speakLongText(
       "Включаю заднюю камеру. Не трогайте телефон. Десять секунд — отойдите на два метра, полный рост в кадре."
@@ -600,7 +605,11 @@ export default function CalibrationScreen() {
             facing={cameraFacing}
             canSwitch={canSwitch}
             onToggle={() =>
-              setCameraFacing((f) => (f === "user" ? "environment" : "user"))
+              setCameraFacing((f) => {
+                const next = f === "user" ? "environment" : "user";
+                cameraFacingRef.current = next;
+                return next;
+              })
             }
           />
           <LiveScanGrid active={scanning} />
@@ -626,6 +635,7 @@ export default function CalibrationScreen() {
         <PhoneScanPreflight
           onSelect={(mode) => {
             setPhoneScanMode(mode);
+            cameraFacingRef.current = "user";
             setCameraFacing("user");
             setSetupDone(false);
             setTripodReady(false);

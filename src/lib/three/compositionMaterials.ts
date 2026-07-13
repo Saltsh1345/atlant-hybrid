@@ -78,7 +78,7 @@ function resolveFatAmt(
   const zoneKey = MESH_FAT_ZONE[n];
   if (!zoneKey) return 0;
   if (fatZones) {
-    let amt = fatZones[zoneKey] ?? 0;
+    const amt = fatZones[zoneKey] ?? 0;
     if (zoneKey === "arms") return 0;
     return amt;
   }
