@@ -54,12 +54,19 @@ function TwinVitalCard({
   );
 }
 
+const UI_MS = 150;
+
 export default function TwinLiveScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const landmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[] | null>(null);
   const [pulseBpm, setPulseBpm] = useState(72);
   const [stressLevel, setStressLevel] = useState(35);
   const [personSeen, setPersonSeen] = useState(false);
+  const personSeenRef = useRef(false);
+  const lastUiAtRef = useRef(0);
+  const pulseBpmRef = useRef(72);
+  const stressLevelRef = useRef(35);
 
   const latchedBody = useAppStore((s) => s.latchedBody);
   const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
@@ -74,14 +81,28 @@ export default function TwinLiveScreen() {
   const { cameraStatus, cameraError } = useCamera(videoRef, true);
   const { tick, poseReady, poseError } = usePoseTracker(videoRef, true);
 
-  const criticalMeshes = useMemo(
-    () => criticalMusclesFromSession(lastSession),
-    [lastSession]
-  );
+  const tickRef = useRef(tick);
+  const selectedSportRef = useRef(selectedSport);
+  const heightCmRef = useRef(profile?.height ?? 175);
+  const updateKinematicsRef = useRef(updateKinematics);
+  const healthRestingBpmRef = useRef<number | null>(null);
+  const healthStressRef = useRef<number | null>(null);
 
   const healthRestingBpm =
     healthReadiness?.metrics?.heartRate?.restingBpm ?? null;
   const healthStress = healthReadiness?.metrics?.stress?.latest ?? null;
+
+  tickRef.current = tick;
+  selectedSportRef.current = selectedSport;
+  heightCmRef.current = profile?.height ?? 175;
+  updateKinematicsRef.current = updateKinematics;
+  healthRestingBpmRef.current = healthRestingBpm;
+  healthStressRef.current = healthStress;
+
+  const criticalMeshes = useMemo(
+    () => criticalMusclesFromSession(lastSession),
+    [lastSession]
+  );
 
   const pulseSource =
     healthConnected && healthRestingBpm != null
@@ -98,54 +119,79 @@ export default function TwinLiveScreen() {
   }, []);
 
   useEffect(() => {
-    let raf: number;
+    let raf = 0;
+    let alive = true;
+
     const loop = () => {
-      const lm = tick();
+      if (!alive) return;
+      const lm = tickRef.current();
+      const now = performance.now();
+      const dueUi = now - lastUiAtRef.current >= UI_MS;
+
       if (lm) {
-        setLandmarks(lm);
-        setPersonSeen(true);
+        landmarksRef.current = lm;
 
         const sport =
-          selectedSport === "boxing" || selectedSport === "tennis"
-            ? selectedSport
+          selectedSportRef.current === "boxing" ||
+          selectedSportRef.current === "tennis"
+            ? selectedSportRef.current
             : "strength";
-        const heightCm = profile?.height ?? 175;
+        const heightCm = heightCmRef.current;
         const k = computeKinematics(lm, sport, heightCm);
-        updateKinematics(k);
+        updateKinematicsRef.current(k);
 
-        const resting = healthRestingBpm ?? 72;
+        const resting = healthRestingBpmRef.current ?? 72;
         // vbt bpm is anchored at 72; shift by known resting HR when available
         const bpm = clamp(Math.round(resting + (k.bpm - 72)), 48, 185);
-        setPulseBpm(bpm);
+        const healthStress = healthStressRef.current;
+        const nextStress =
+          healthStress != null
+            ? clamp(Math.round(healthStress), 0, 100)
+            : // Fatigue + activity delta as a live stress proxy (not clinical)
+              clamp(
+                Math.round(
+                  k.fatiguePercent * 0.55 +
+                    clamp((bpm - resting) / 60, 0, 1) * 45
+                ),
+                5,
+                95
+              );
 
-        if (healthStress != null) {
-          setStressLevel(clamp(Math.round(healthStress), 0, 100));
-        } else {
-          // Fatigue + activity delta as a live stress proxy (not clinical)
-          const activity = clamp((bpm - resting) / 60, 0, 1);
-          const estimated = clamp(
-            Math.round(k.fatiguePercent * 0.55 + activity * 45),
-            5,
-            95
-          );
-          setStressLevel(estimated);
+        if (!personSeenRef.current) {
+          personSeenRef.current = true;
+          setPersonSeen(true);
+        }
+
+        if (dueUi) {
+          lastUiAtRef.current = now;
+          setLandmarks(lm);
+          if (pulseBpmRef.current !== bpm) {
+            pulseBpmRef.current = bpm;
+            setPulseBpm(bpm);
+          }
+          if (stressLevelRef.current !== nextStress) {
+            stressLevelRef.current = nextStress;
+            setStressLevel(nextStress);
+          }
         }
       } else {
-        setLandmarks(null);
-        setPersonSeen(false);
+        landmarksRef.current = null;
+        if (personSeenRef.current) {
+          personSeenRef.current = false;
+          setPersonSeen(false);
+          setLandmarks(null);
+          lastUiAtRef.current = now;
+        }
       }
       raf = requestAnimationFrame(loop);
     };
+
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [
-    tick,
-    selectedSport,
-    profile?.height,
-    updateKinematics,
-    healthRestingBpm,
-    healthStress,
-  ]);
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+    };
+  }, []);
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#05070c] text-white">
