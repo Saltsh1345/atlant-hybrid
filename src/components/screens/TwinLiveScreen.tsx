@@ -10,9 +10,13 @@ import { criticalMusclesFromSession } from "@/lib/three/muscleGroups";
 import { computeKinematics, resetVbtState } from "@/lib/pose/vbt";
 import {
   LivePulseEstimator,
+  RPPG_TRUST_CONFIDENCE,
   computeLiveStress,
+  rppgStatusHint,
   smoothKinematicPulse,
+  type FaceRoiNorm,
   type PulseSignalSource,
+  type RppgCamStatus,
 } from "@/lib/vitals/livePulse";
 import { useRef, useEffect, useState, useMemo } from "react";
 import type { NormalizedLandmark } from "@/types";
@@ -66,10 +70,16 @@ const VITALS_MS = 500;
 function pulseHint(
   personSeen: boolean,
   source: PulseSignalSource,
-  healthResting: boolean
+  healthResting: boolean,
+  camStatus: RppgCamStatus,
+  camTrusted: boolean
 ): string {
   if (!personSeen) return "человек не в кадре";
-  if (source === "camera") return "камера · оценка (не мед. rPPG)";
+  if (source === "camera") return rppgStatusHint(camStatus, camTrusted);
+  // Fallbacks while camera still accumulates / rejects motion
+  if (camStatus === "accumulating") return "накопление сигнала… · временно движение";
+  if (camStatus === "motion") return "движение · кинематика (камера ждёт)";
+  if (camStatus === "low_light") return "мало света · запасной расчёт";
   if (source === "health" || healthResting)
     return "Health + движение · оценка";
   if (source === "kinematics") return "движение · оценка";
@@ -93,6 +103,9 @@ export default function TwinLiveScreen() {
   const [stressLevel, setStressLevel] = useState(35);
   const [personSeen, setPersonSeen] = useState(false);
   const [pulseSource, setPulseSource] = useState<PulseSignalSource>("none");
+  const [rppgStatus, setRppgStatus] = useState<RppgCamStatus>("no_face");
+  const [rppgTrusted, setRppgTrusted] = useState(false);
+  const [faceRoi, setFaceRoi] = useState<FaceRoiNorm | null>(null);
   const [vitalsDisplay, setVitalsDisplay] = useState<"live" | "hold" | "none">(
     "none"
   );
@@ -102,6 +115,9 @@ export default function TwinLiveScreen() {
   const pulseBpmRef = useRef(72);
   const stressLevelRef = useRef(35);
   const pulseSourceRef = useRef<PulseSignalSource>("none");
+  const rppgStatusRef = useRef<RppgCamStatus>("no_face");
+  const rppgTrustedRef = useRef(false);
+  const faceRoiRef = useRef<FaceRoiNorm | null>(null);
   const vitalsDisplayRef = useRef<"live" | "hold" | "none">("none");
   const pulseEstimatorRef = useRef<LivePulseEstimator | null>(null);
 
@@ -169,7 +185,10 @@ export default function TwinLiveScreen() {
       nextBpm: number,
       nextStress: number,
       nextSource: PulseSignalSource,
-      display: "live" | "hold"
+      display: "live" | "hold",
+      nextStatus: RppgCamStatus,
+      trusted: boolean,
+      nextRoi: FaceRoiNorm | null
     ) => {
       const bpmRounded = Math.round(nextBpm);
       const stressRounded = Math.round(nextStress);
@@ -189,6 +208,28 @@ export default function TwinLiveScreen() {
       if (vitalsDisplayRef.current !== display) {
         vitalsDisplayRef.current = display;
         setVitalsDisplay(display);
+      }
+      if (rppgStatusRef.current !== nextStatus) {
+        rppgStatusRef.current = nextStatus;
+        setRppgStatus(nextStatus);
+      }
+      if (rppgTrustedRef.current !== trusted) {
+        rppgTrustedRef.current = trusted;
+        setRppgTrusted(trusted);
+      }
+      const prevRoi = faceRoiRef.current;
+      const roiChanged =
+        (!prevRoi && !!nextRoi) ||
+        (!!prevRoi && !nextRoi) ||
+        (!!prevRoi &&
+          !!nextRoi &&
+          (Math.abs(prevRoi.nx - nextRoi.nx) > 0.01 ||
+            Math.abs(prevRoi.ny - nextRoi.ny) > 0.01 ||
+            Math.abs(prevRoi.nw - nextRoi.nw) > 0.01 ||
+            Math.abs(prevRoi.nh - nextRoi.nh) > 0.01));
+      if (roiChanged) {
+        faceRoiRef.current = nextRoi;
+        setFaceRoi(nextRoi);
       }
     };
 
@@ -212,12 +253,16 @@ export default function TwinLiveScreen() {
 
         const resting = healthRestingBpmRef.current ?? 72;
         const estimator = pulseEstimatorRef.current;
-        const camPulse = estimator?.sample(videoRef.current, lm, now) ?? null;
+        const camPulse =
+          estimator?.sample(videoRef.current, lm, now) ?? null;
 
         let nextBpm: number;
         let nextSource: PulseSignalSource;
+        const camStatus = camPulse?.status ?? "no_face";
+        const camTrusted =
+          !!camPulse && camPulse.confidence >= RPPG_TRUST_CONFIDENCE;
 
-        if (camPulse && camPulse.confidence >= 0.35) {
+        if (camTrusted && camPulse) {
           nextBpm = camPulse.bpm;
           nextSource = "camera";
         } else {
@@ -256,7 +301,15 @@ export default function TwinLiveScreen() {
 
         if (dueVitals) {
           lastVitalsAtRef.current = now;
-          publishVitals(nextBpm, nextStress, nextSource, "live");
+          publishVitals(
+            nextBpm,
+            nextStress,
+            nextSource,
+            "live",
+            camStatus,
+            camTrusted,
+            camPulse?.roi ?? null
+          );
         }
       } else {
         landmarksRef.current = null;
@@ -292,7 +345,10 @@ export default function TwinLiveScreen() {
             nextBpm,
             nextStress,
             pulseSourceRef.current,
-            "hold"
+            "hold",
+            "no_face",
+            false,
+            null
           );
         }
       }
@@ -309,7 +365,9 @@ export default function TwinLiveScreen() {
   const pulseHintText = pulseHint(
     personSeen,
     pulseSource,
-    healthConnected && healthRestingBpm != null
+    healthConnected && healthRestingBpm != null,
+    rppgStatus,
+    rppgTrusted
   );
   const stressHintText = stressHint(
     personSeen,
@@ -395,13 +453,29 @@ export default function TwinLiveScreen() {
           />
           <PoseOverlay landmarksRef={landmarksRef} />
 
+          {/* Subtle face ROI while sampling (coords are raw; video is CSS-mirrored) */}
+          {personSeen && faceRoi && (
+            <div
+              className="pointer-events-none absolute z-10 rounded border border-rose-300/35 bg-rose-400/5"
+              style={{
+                left: `${(1 - faceRoi.nx - faceRoi.nw) * 100}%`,
+                top: `${faceRoi.ny * 100}%`,
+                width: `${faceRoi.nw * 100}%`,
+                height: `${faceRoi.nh * 100}%`,
+              }}
+              aria-hidden
+            />
+          )}
+
           <div className="pointer-events-none absolute left-3 top-3 z-20 rounded-lg border border-white/15 bg-black/55 px-2.5 py-1.5 backdrop-blur-sm">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300/90">
               Живая камера
             </p>
             <p className="text-[10px] text-white/55">
               {personSeen
-                ? "Поза и аналитика на человеке"
+                ? rppgTrusted
+                  ? "rPPG с лица · сидите ровно"
+                  : "Лицо в кадре · лучше при хорошем свете"
                 : "Встаньте в кадр для трекинга"}
             </p>
           </div>
