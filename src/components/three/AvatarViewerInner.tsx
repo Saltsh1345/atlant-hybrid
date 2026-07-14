@@ -32,6 +32,7 @@ const BODY_MID_Y = BODY_HEIGHT * 0.5;
 /**
  * Fit head-to-toe into the actual canvas aspect (narrow side panels need
  * more camera distance than wide cards — fixed Z alone clips the head).
+ * Re-applies on resize and for the first frames while CSS flex layout settles.
  */
 function FitFullBodyCamera({
   enabled,
@@ -44,8 +45,9 @@ function FitFullBodyCamera({
 }) {
   const { camera, size } = useThree();
   const lastKey = useRef("");
+  const frameRef = useRef(0);
 
-  useEffect(() => {
+  const applyFit = () => {
     if (!enabled) return;
     const cam = camera as THREE.PerspectiveCamera;
     if (!cam.isPerspectiveCamera) return;
@@ -53,25 +55,44 @@ function FitFullBodyCamera({
     const w = Math.max(1, size.width);
     const h = Math.max(1, size.height);
     const aspect = w / h;
-    const key = `${Math.round(w)}x${Math.round(h)}:${fov}:${padding}`;
-    if (key === lastKey.current) return;
+    const key = `${Math.round(w)}x${Math.round(h)}:${fov}:${padding.toFixed(2)}`;
+    // Always allow first few frames after mount/layout; then only on key change
+    const early = frameRef.current < 45;
+    if (!early && key === lastKey.current) return;
     lastKey.current = key;
 
     cam.fov = fov;
+    cam.aspect = aspect;
     const vFovRad = THREE.MathUtils.degToRad(cam.fov);
     const halfV = Math.tan(vFovRad / 2);
     const halfH = halfV * aspect;
 
-    const needY = (BODY_HEIGHT * padding) / 2 / halfV;
-    const needX = (BODY_WIDTH * padding) / 2 / Math.max(halfH, 1e-4);
-    const dist = Math.max(needY, needX, 3.4);
+    // Extra top bias: HUD pills sit over the canvas
+    const hudPad = padding + 0.12;
+    const needY = (BODY_HEIGHT * hudPad) / 2 / halfV;
+    const needX = (BODY_WIDTH * hudPad) / 2 / Math.max(halfH, 1e-4);
+    const dist = Math.max(needY, needX, 4.2);
 
-    cam.position.set(0, BODY_MID_Y, dist);
+    // Aim slightly below true mid so head clears top HUD
+    const lookY = BODY_MID_Y - 0.06;
+    cam.position.set(0, lookY, dist);
     cam.near = 0.01;
     cam.far = 1000;
-    cam.lookAt(0, BODY_MID_Y, 0);
+    cam.lookAt(0, lookY, 0);
     cam.updateProjectionMatrix();
+  };
+
+  useEffect(() => {
+    applyFit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- size/fov/padding drive via refs below
   }, [enabled, camera, size.width, size.height, fov, padding]);
+
+  useFrame(() => {
+    frameRef.current += 1;
+    if (frameRef.current <= 45 || frameRef.current % 30 === 0) {
+      applyFit();
+    }
+  });
 
   return null;
 }
@@ -471,8 +492,12 @@ export default function AvatarViewerInner({
         ? 3.5
         : 3.1;
   const camY = useFitCam ? BODY_MID_Y : ghostMode ? 0.9 : 0.95;
-  const camFov = useFitCam ? (narrowPanelFit ? 28 : 30) : 34;
-  const fitPadding = narrowPanelFit ? 1.32 : frameFullBody || compositionMode ? 1.22 : 1.15;
+  const camFov = useFitCam ? (narrowPanelFit ? 26 : 30) : 34;
+  const fitPadding = narrowPanelFit
+    ? 1.48
+    : frameFullBody || compositionMode
+      ? 1.28
+      : 1.15;
   const orbitTargetY = useFitCam ? BODY_MID_Y : 0.85;
 
   return (
