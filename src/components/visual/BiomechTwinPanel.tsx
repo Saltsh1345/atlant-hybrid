@@ -19,7 +19,7 @@ interface BiomechTwinPanelProps {
   landmarks?: NormalizedLandmark[] | null;
   /** Soft dashboard look: no wireframe, no red “critical” scare, calm HUD */
   calm?: boolean;
-  /** Live camera screen: full hologram over video, not tiny PIP */
+  /** Live twin screen: side panel that tracks pose from camera */
   live?: boolean;
 }
 
@@ -68,7 +68,7 @@ export default function BiomechTwinPanel({
             : ""
       } ${
         live
-          ? "h-[min(52vh,460px)] w-full"
+          ? "h-full min-h-[240px] w-full"
           : compact
             ? "h-48"
             : tall
