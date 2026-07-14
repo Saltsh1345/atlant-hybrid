@@ -195,6 +195,7 @@ export default function BiomechTwinPanel({
             interactive={!live}
             calmLighting={calm || live}
             frameFullBody={!compact}
+            narrowPanelFit={live}
           />
         )}
       </div>

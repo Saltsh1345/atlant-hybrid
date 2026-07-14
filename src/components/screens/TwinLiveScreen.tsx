@@ -8,6 +8,12 @@ import { useCamera, usePoseTracker } from "@/hooks/usePoseTracker";
 import { useAppStore } from "@/store/useAppStore";
 import { criticalMusclesFromSession } from "@/lib/three/muscleGroups";
 import { computeKinematics, resetVbtState } from "@/lib/pose/vbt";
+import {
+  LivePulseEstimator,
+  computeLiveStress,
+  smoothKinematicPulse,
+  type PulseSignalSource,
+} from "@/lib/vitals/livePulse";
 import { useRef, useEffect, useState, useMemo } from "react";
 import type { NormalizedLandmark } from "@/types";
 
@@ -54,7 +60,32 @@ function TwinVitalCard({
   );
 }
 
+/** Pose / HUD refresh — keep c8fbcc8 style throttling to avoid max-update-depth */
 const UI_MS = 150;
+/** Vitals (pulse/stress) can update a bit slower — still feels live */
+const VITALS_MS = 500;
+
+function pulseHint(
+  personSeen: boolean,
+  source: PulseSignalSource,
+  healthResting: boolean
+): string {
+  if (!personSeen) return "человек не в кадре";
+  if (source === "camera") return "камера · оценка (не мед. rPPG)";
+  if (source === "health" || healthResting)
+    return "Health + движение · оценка";
+  if (source === "kinematics") return "движение · оценка";
+  return "нет сигнала";
+}
+
+function stressHint(
+  personSeen: boolean,
+  healthStress: boolean
+): string {
+  if (!personSeen) return "человек не в кадре";
+  if (healthStress) return "Health + пульс/кинематика · оценка";
+  return "пульс + кинематика · оценка";
+}
 
 export default function TwinLiveScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -63,10 +94,19 @@ export default function TwinLiveScreen() {
   const [pulseBpm, setPulseBpm] = useState(72);
   const [stressLevel, setStressLevel] = useState(35);
   const [personSeen, setPersonSeen] = useState(false);
+  const [pulseSource, setPulseSource] = useState<PulseSignalSource>("none");
+  const [vitalsDisplay, setVitalsDisplay] = useState<"live" | "hold" | "none">(
+    "none"
+  );
+
   const personSeenRef = useRef(false);
   const lastUiAtRef = useRef(0);
+  const lastVitalsAtRef = useRef(0);
   const pulseBpmRef = useRef(72);
   const stressLevelRef = useRef(35);
+  const pulseSourceRef = useRef<PulseSignalSource>("none");
+  const vitalsDisplayRef = useRef<"live" | "hold" | "none">("none");
+  const pulseEstimatorRef = useRef<LivePulseEstimator | null>(null);
 
   const latchedBody = useAppStore((s) => s.latchedBody);
   const bodyDataLocked = useAppStore((s) => s.bodyDataLocked);
@@ -87,6 +127,7 @@ export default function TwinLiveScreen() {
   const updateKinematicsRef = useRef(updateKinematics);
   const healthRestingBpmRef = useRef<number | null>(null);
   const healthStressRef = useRef<number | null>(null);
+  const healthConnectedRef = useRef(healthConnected);
 
   const healthRestingBpm =
     healthReadiness?.metrics?.heartRate?.restingBpm ?? null;
@@ -98,35 +139,68 @@ export default function TwinLiveScreen() {
   updateKinematicsRef.current = updateKinematics;
   healthRestingBpmRef.current = healthRestingBpm;
   healthStressRef.current = healthStress;
+  healthConnectedRef.current = healthConnected;
 
   const criticalMeshes = useMemo(
     () => criticalMusclesFromSession(lastSession),
     [lastSession]
   );
 
-  const pulseSource =
-    healthConnected && healthRestingBpm != null
-      ? "базовый HR + движение"
-      : "оценка по движению (не rPPG)";
-  const stressSource =
-    healthConnected && healthStress != null
-      ? "Health Kit"
-      : "оценка по кинематике";
+  const pulseValue =
+    vitalsDisplay === "none" ? "—" : String(Math.round(pulseBpm));
+  const stressValue =
+    vitalsDisplay === "none" ? "—" : String(Math.round(stressLevel));
+  const pulseBar =
+    vitalsDisplay === "none" ? 0 : (pulseBpm - 48) / (185 - 48);
+  const stressBar = vitalsDisplay === "none" ? 0 : stressLevel / 100;
 
   useEffect(() => {
     resetVbtState();
-    return () => resetVbtState();
+    pulseEstimatorRef.current = new LivePulseEstimator();
+    pulseEstimatorRef.current.reset(healthRestingBpmRef.current ?? 72);
+    return () => {
+      resetVbtState();
+      pulseEstimatorRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
     let raf = 0;
     let alive = true;
 
+    const publishVitals = (
+      nextBpm: number,
+      nextStress: number,
+      nextSource: PulseSignalSource,
+      display: "live" | "hold"
+    ) => {
+      const bpmRounded = Math.round(nextBpm);
+      const stressRounded = Math.round(nextStress);
+
+      pulseBpmRef.current = nextBpm;
+      stressLevelRef.current = nextStress;
+
+      setPulseBpm((prev) => (prev !== bpmRounded ? bpmRounded : prev));
+      setStressLevel((prev) =>
+        prev !== stressRounded ? stressRounded : prev
+      );
+
+      if (pulseSourceRef.current !== nextSource) {
+        pulseSourceRef.current = nextSource;
+        setPulseSource(nextSource);
+      }
+      if (vitalsDisplayRef.current !== display) {
+        vitalsDisplayRef.current = display;
+        setVitalsDisplay(display);
+      }
+    };
+
     const loop = () => {
       if (!alive) return;
       const lm = tickRef.current();
       const now = performance.now();
       const dueUi = now - lastUiAtRef.current >= UI_MS;
+      const dueVitals = now - lastVitalsAtRef.current >= VITALS_MS;
 
       if (lm) {
         landmarksRef.current = lm;
@@ -141,21 +215,43 @@ export default function TwinLiveScreen() {
         updateKinematicsRef.current(k);
 
         const resting = healthRestingBpmRef.current ?? 72;
-        // vbt bpm is anchored at 72; shift by known resting HR when available
-        const bpm = clamp(Math.round(resting + (k.bpm - 72)), 48, 185);
-        const healthStress = healthStressRef.current;
-        const nextStress =
-          healthStress != null
-            ? clamp(Math.round(healthStress), 0, 100)
-            : // Fatigue + activity delta as a live stress proxy (not clinical)
-              clamp(
-                Math.round(
-                  k.fatiguePercent * 0.55 +
-                    clamp((bpm - resting) / 60, 0, 1) * 45
-                ),
-                5,
-                95
-              );
+        const estimator = pulseEstimatorRef.current;
+        const camPulse = estimator?.sample(videoRef.current, lm, now) ?? null;
+
+        let nextBpm: number;
+        let nextSource: PulseSignalSource;
+
+        if (camPulse && camPulse.confidence >= 0.35) {
+          nextBpm = camPulse.bpm;
+          nextSource = "camera";
+        } else {
+          nextBpm = smoothKinematicPulse(
+            pulseBpmRef.current,
+            k.velocityMs,
+            k.fatiguePercent,
+            resting,
+            true
+          );
+          nextSource =
+            healthConnectedRef.current && healthRestingBpmRef.current != null
+              ? "health"
+              : "kinematics";
+        }
+
+        nextBpm = clamp(nextBpm, 48, 185);
+        const nextStress = computeLiveStress({
+          bpm: nextBpm,
+          restingBpm: resting,
+          fatiguePercent: k.fatiguePercent,
+          velocityMs: k.velocityMs,
+          healthStress: healthStressRef.current,
+          personPresent: true,
+          prev: stressLevelRef.current,
+        });
+
+        // Keep float targets in refs between throttled publishes
+        pulseBpmRef.current = nextBpm;
+        stressLevelRef.current = nextStress;
 
         if (!personSeenRef.current) {
           personSeenRef.current = true;
@@ -165,22 +261,52 @@ export default function TwinLiveScreen() {
         if (dueUi) {
           lastUiAtRef.current = now;
           setLandmarks(lm);
-          if (pulseBpmRef.current !== bpm) {
-            pulseBpmRef.current = bpm;
-            setPulseBpm(bpm);
-          }
-          if (stressLevelRef.current !== nextStress) {
-            stressLevelRef.current = nextStress;
-            setStressLevel(nextStress);
-          }
+        }
+
+        if (dueVitals) {
+          lastVitalsAtRef.current = now;
+          publishVitals(nextBpm, nextStress, nextSource, "live");
         }
       } else {
         landmarksRef.current = null;
+
+        const resting = healthRestingBpmRef.current ?? 72;
+        const nextBpm = smoothKinematicPulse(
+          pulseBpmRef.current,
+          0,
+          0,
+          resting,
+          false
+        );
+        const nextStress = computeLiveStress({
+          bpm: nextBpm,
+          restingBpm: resting,
+          fatiguePercent: 0,
+          velocityMs: 0,
+          healthStress: healthStressRef.current,
+          personPresent: false,
+          prev: stressLevelRef.current,
+        });
+        pulseBpmRef.current = nextBpm;
+        stressLevelRef.current = nextStress;
+
         if (personSeenRef.current) {
           personSeenRef.current = false;
-          setPersonSeen(false);
-          setLandmarks(null);
-          lastUiAtRef.current = now;
+          if (dueUi) {
+            lastUiAtRef.current = now;
+            setPersonSeen(false);
+            setLandmarks(null);
+          }
+        }
+
+        if (dueVitals && vitalsDisplayRef.current !== "none") {
+          lastVitalsAtRef.current = now;
+          publishVitals(
+            nextBpm,
+            nextStress,
+            pulseSourceRef.current,
+            "hold"
+          );
         }
       }
       raf = requestAnimationFrame(loop);
@@ -192,6 +318,30 @@ export default function TwinLiveScreen() {
       cancelAnimationFrame(raf);
     };
   }, []);
+
+  const pulseHintText = pulseHint(
+    personSeen,
+    pulseSource,
+    healthConnected && healthRestingBpm != null
+  );
+  const stressHintText = stressHint(
+    personSeen,
+    healthConnected && healthStress != null
+  );
+
+  // Hold last values when briefly out of frame, but show status
+  const showPulseHint =
+    !personSeen && vitalsDisplay === "hold"
+      ? "человек не в кадре · последнее"
+      : !personSeen && vitalsDisplay === "none"
+        ? "нет сигнала"
+        : pulseHintText;
+  const showStressHint =
+    !personSeen && vitalsDisplay === "hold"
+      ? "человек не в кадре · последнее"
+      : !personSeen && vitalsDisplay === "none"
+        ? "нет сигнала"
+        : stressHintText;
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#05070c] text-white">
@@ -210,6 +360,11 @@ export default function TwinLiveScreen() {
         {personSeen && (
           <span className="ml-auto rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
             Онлайн
+          </span>
+        )}
+        {!personSeen && vitalsDisplay === "hold" && (
+          <span className="ml-auto rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-200">
+            Нет в кадре
           </span>
         )}
       </header>
@@ -264,13 +419,14 @@ export default function TwinLiveScreen() {
             </p>
           </div>
 
-          {personSeen && (
+          {vitalsDisplay !== "none" && (
             <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-20 flex flex-wrap gap-2">
               <span className="rounded-md border border-white/10 bg-black/50 px-2 py-1 font-mono text-[10px] text-white/70 backdrop-blur-sm">
-                BPM {pulseBpm}
+                BPM {pulseValue}
+                {!personSeen ? " · вне кадра" : ""}
               </span>
               <span className="rounded-md border border-white/10 bg-black/50 px-2 py-1 font-mono text-[10px] text-white/70 backdrop-blur-sm">
-                Стресс {stressLevel}
+                Стресс {stressValue}
               </span>
               {latchedBody && (
                 <span className="rounded-md border border-white/10 bg-black/50 px-2 py-1 font-mono text-[10px] text-white/70 backdrop-blur-sm">
@@ -290,22 +446,22 @@ export default function TwinLiveScreen() {
 
           <TwinVitalCard
             label="Пульс"
-            value={String(pulseBpm)}
+            value={pulseValue}
             unit="BPM"
-            hint={pulseSource}
+            hint={showPulseHint}
             valueClass="text-rose-400"
             barClass="bg-rose-400"
-            barRatio={(pulseBpm - 48) / (185 - 48)}
+            barRatio={pulseBar}
           />
 
           <TwinVitalCard
             label="Стресс"
-            value={String(stressLevel)}
+            value={stressValue}
             unit="/ 100"
-            hint={stressSource}
+            hint={showStressHint}
             valueClass="text-amber-400"
             barClass="bg-amber-400"
-            barRatio={stressLevel / 100}
+            barRatio={stressBar}
           />
 
           {latchedBody && (

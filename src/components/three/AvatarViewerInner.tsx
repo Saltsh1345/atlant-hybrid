@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef } from "react";
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import * as THREE from "three";
@@ -23,6 +23,58 @@ import {
 } from "@/lib/three/compositionMaterials";
 import { normalizeMeshName } from "@/lib/three/muscleGroups";
 import AvatarFloorGrid from "@/components/three/AvatarFloorGrid";
+
+/** Body height after fitModelToScene(targetHeight=1.75) */
+const BODY_HEIGHT = 1.75;
+const BODY_WIDTH = 0.95;
+const BODY_MID_Y = BODY_HEIGHT * 0.5;
+
+/**
+ * Fit head-to-toe into the actual canvas aspect (narrow side panels need
+ * more camera distance than wide cards — fixed Z alone clips the head).
+ */
+function FitFullBodyCamera({
+  enabled,
+  fov,
+  padding = 1.22,
+}: {
+  enabled: boolean;
+  fov: number;
+  padding?: number;
+}) {
+  const { camera, size } = useThree();
+  const lastKey = useRef("");
+
+  useEffect(() => {
+    if (!enabled) return;
+    const cam = camera as THREE.PerspectiveCamera;
+    if (!cam.isPerspectiveCamera) return;
+
+    const w = Math.max(1, size.width);
+    const h = Math.max(1, size.height);
+    const aspect = w / h;
+    const key = `${Math.round(w)}x${Math.round(h)}:${fov}:${padding}`;
+    if (key === lastKey.current) return;
+    lastKey.current = key;
+
+    cam.fov = fov;
+    const vFovRad = THREE.MathUtils.degToRad(cam.fov);
+    const halfV = Math.tan(vFovRad / 2);
+    const halfH = halfV * aspect;
+
+    const needY = (BODY_HEIGHT * padding) / 2 / halfV;
+    const needX = (BODY_WIDTH * padding) / 2 / Math.max(halfH, 1e-4);
+    const dist = Math.max(needY, needX, 3.4);
+
+    cam.position.set(0, BODY_MID_Y, dist);
+    cam.near = 0.01;
+    cam.far = 1000;
+    cam.lookAt(0, BODY_MID_Y, 0);
+    cam.updateProjectionMatrix();
+  }, [enabled, camera, size.width, size.height, fov, padding]);
+
+  return null;
+}
 
 export type AvatarModelKind =
   | "loading"
@@ -369,6 +421,8 @@ export interface AvatarViewerInnerProps {
   transparentBackground?: boolean;
   /** Pull camera back so head/feet are not clipped in card */
   frameFullBody?: boolean;
+  /** Extra framing margin for tall/narrow live side panels */
+  narrowPanelFit?: boolean;
   onModelKind?: (kind: AvatarModelKind) => void;
 }
 
@@ -392,6 +446,7 @@ export default function AvatarViewerInner({
   ghostMode = false,
   transparentBackground = false,
   frameFullBody = false,
+  narrowPanelFit = false,
   onModelKind,
 }: AvatarViewerInnerProps) {
   const rig = useMemo(
@@ -407,22 +462,25 @@ export default function AvatarViewerInner({
         ? "h-52"
         : "h-48";
   const hasAlert = !calmLighting && !ghostMode && (criticalMeshes?.length ?? 0) > 0;
+  const useFitCam = frameFullBody || narrowPanelFit || compositionMode;
   const camZ = ghostMode
     ? 3.35
-    : frameFullBody || compositionMode
-      ? 4.05
+    : useFitCam
+      ? 5.2
       : hasAlert
         ? 3.5
         : 3.1;
-  const camY = frameFullBody ? 0.88 : ghostMode ? 0.9 : 0.95;
-  const camFov = frameFullBody ? 31 : 34;
+  const camY = useFitCam ? BODY_MID_Y : ghostMode ? 0.9 : 0.95;
+  const camFov = useFitCam ? (narrowPanelFit ? 28 : 30) : 34;
+  const fitPadding = narrowPanelFit ? 1.32 : frameFullBody || compositionMode ? 1.22 : 1.15;
+  const orbitTargetY = useFitCam ? BODY_MID_Y : 0.85;
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-2xl ${
+      className={`relative h-full w-full overflow-hidden rounded-2xl ${
         transparentBackground ? "bg-transparent" : "bg-black"
       } ${heightClass}`}
-      style={fillHeight ? { minHeight: 220 } : undefined}
+      style={fillHeight ? { minHeight: 220, height: "100%" } : undefined}
     >
       {!assetReady && (
         <div
@@ -452,8 +510,15 @@ export default function AvatarViewerInner({
           height: "100%",
         }}
         dpr={[1, 1.75]}
-        resize={{ scroll: false, debounce: 100 }}
+        resize={{ scroll: false, debounce: 50 }}
       >
+        {useFitCam && !ghostMode && (
+          <FitFullBodyCamera
+            enabled
+            fov={camFov}
+            padding={fitPadding}
+          />
+        )}
         {!transparentBackground && <color attach="background" args={["#000000"]} />}
         <ambientLight intensity={ghostMode ? 0.04 : compositionMode ? 0.12 : 0.08} />
         <pointLight
@@ -497,7 +562,9 @@ export default function AvatarViewerInner({
             dampingFactor={0.08}
             minPolarAngle={Math.PI / 5}
             maxPolarAngle={Math.PI / 1.85}
-            target={[0, frameFullBody ? 0.9 : 0.85, 0]}
+            target={[0, orbitTargetY, 0]}
+            minDistance={useFitCam ? 3.6 : 2.2}
+            maxDistance={useFitCam ? 9 : 6}
           />
         )}
       </Canvas>
