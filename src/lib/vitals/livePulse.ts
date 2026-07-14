@@ -7,6 +7,7 @@ export type PulseSignalSource = "camera" | "kinematics" | "health" | "none";
 export type RppgCamStatus =
   | "no_face"
   | "accumulating"
+  | "refining"
   | "low_light"
   | "motion"
   | "weak"
@@ -28,15 +29,26 @@ export interface PulseEstimate {
   roi: FaceRoiNorm | null;
 }
 
+/** Rolling window kept for refining (longer = stabler, slower fill score). */
 const BUFFER_SEC = 18;
-const MIN_HISTORY_SEC = 8;
+/** Seconds of face samples before first spectral BPM attempt. */
+const MIN_HISTORY_SEC = 6;
+/** Confidence fill reaches 1.0 by this duration (buffer still grows to BUFFER_SEC). */
+const FILL_REF_SEC = 12;
+/** ~6 s at ≥12 Hz sampling. */
+const MIN_SAMPLES = 72;
 const MIN_BPM = 42;
 const MAX_BPM = 180;
 const BAND_HZ_LO = 0.7;
 const BAND_HZ_HI = 3.0;
 const SAMPLE_INTERVAL_MS = 33;
-/** Prefer camera rPPG over kinematics/Health when ≥ this. */
-export const RPPG_TRUST_CONFIDENCE = 0.42;
+/**
+ * Provisional camera lock — show early rPPG BPM while still refining.
+ * Below this, prefer kinematics/Health.
+ */
+export const RPPG_PROVISIONAL_CONFIDENCE = 0.28;
+/** Full-trust threshold for stable camera rPPG (slightly easier early lock). */
+export const RPPG_TRUST_CONFIDENCE = 0.38;
 
 const POSE_L_EYE = 2;
 const POSE_R_EYE = 5;
@@ -267,17 +279,17 @@ export class LivePulseEstimator {
     this.pushSample(now, green, nose);
 
     const historySec = this.historyDurationSec();
-    if (historySec < MIN_HISTORY_SEC || this.greens.length < 90) {
+    if (historySec < MIN_HISTORY_SEC || this.greens.length < MIN_SAMPLES) {
       this.lastStatus = "accumulating";
       const fill = clamp(historySec / MIN_HISTORY_SEC, 0, 1);
-      this.lastConfidence = fill * 0.28;
+      this.lastConfidence = fill * 0.22;
       return this.snapshot("camera", now);
     }
 
     const motion = this.motionScore(now);
     if (motion > 0.045) {
       this.lastStatus = "motion";
-      this.lastConfidence = Math.min(this.lastConfidence, 0.28);
+      this.lastConfidence = Math.min(this.lastConfidence, 0.26);
       // Still try estimate, but confidence stays low → kinematics preferred
       if (now - this.lastEstimateAt < 400) {
         return this.snapshot("camera", now);
@@ -293,7 +305,7 @@ export class LivePulseEstimator {
     const result = this.estimateFromBuffer(motion);
     if (!result) {
       if (this.lastStatus !== "motion" && this.lastStatus !== "low_light") {
-        this.lastStatus = historySec < 12 ? "accumulating" : "weak";
+        this.lastStatus = historySec < FILL_REF_SEC ? "accumulating" : "weak";
       }
       this.lastConfidence = Math.max(0.1, this.lastConfidence * 0.85);
       return this.snapshot("camera", now);
@@ -307,7 +319,7 @@ export class LivePulseEstimator {
     // Soft clamp jumps vs prior smoothed value
     const maxStep = this.lastGoodAt && now - this.lastGoodAt < 3000 ? 12 : 28;
     const stepped = clamp(med, this.smoothedBpm - maxStep, this.smoothedBpm + maxStep);
-    const alpha = confidence >= 0.55 ? 0.28 : 0.16;
+    const alpha = confidence >= 0.55 ? 0.28 : confidence >= RPPG_PROVISIONAL_CONFIDENCE ? 0.2 : 0.14;
     this.smoothedBpm += (stepped - this.smoothedBpm) * alpha;
 
     this.lastGoodAt = now;
@@ -315,11 +327,13 @@ export class LivePulseEstimator {
     this.lastStatus =
       confidence >= RPPG_TRUST_CONFIDENCE
         ? "ok"
-        : motion > 0.035
-          ? "motion"
-          : snr < 1.6
-            ? "weak"
-            : "accumulating";
+        : confidence >= RPPG_PROVISIONAL_CONFIDENCE
+          ? "refining"
+          : motion > 0.035
+            ? "motion"
+            : snr < 1.6
+              ? "weak"
+              : "accumulating";
 
     return this.snapshot("camera", now);
   }
@@ -762,6 +776,8 @@ export function rppgStatusHint(
       return "человек не в кадре";
     case "accumulating":
       return "камера · накопление сигнала…";
+    case "refining":
+      return "камера · ранняя оценка, уточняем…";
     case "low_light":
       return "мало света · оценка ограничена";
     case "motion":

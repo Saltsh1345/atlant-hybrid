@@ -10,6 +10,7 @@ import { criticalMusclesFromSession } from "@/lib/three/muscleGroups";
 import { computeKinematics, resetVbtState } from "@/lib/pose/vbt";
 import {
   LivePulseEstimator,
+  RPPG_PROVISIONAL_CONFIDENCE,
   RPPG_TRUST_CONFIDENCE,
   computeLiveStress,
   rppgStatusHint,
@@ -78,6 +79,7 @@ function pulseHint(
   if (source === "camera") return rppgStatusHint(camStatus, camTrusted);
   // Fallbacks while camera still accumulates / rejects motion
   if (camStatus === "accumulating") return "накопление сигнала… · временно движение";
+  if (camStatus === "refining") return "камера уточняет · временно движение";
   if (camStatus === "motion") return "движение · кинематика (камера ждёт)";
   if (camStatus === "low_light") return "мало света · запасной расчёт";
   if (source === "health" || healthResting)
@@ -261,8 +263,12 @@ export default function TwinLiveScreen() {
         const camStatus = camPulse?.status ?? "no_face";
         const camTrusted =
           !!camPulse && camPulse.confidence >= RPPG_TRUST_CONFIDENCE;
+        const camProvisional =
+          !!camPulse &&
+          camPulse.confidence >= RPPG_PROVISIONAL_CONFIDENCE;
 
-        if (camTrusted && camPulse) {
+        // Early lock (~6s): show camera BPM while still refining.
+        if ((camTrusted || camProvisional) && camPulse) {
           nextBpm = camPulse.bpm;
           nextSource = "camera";
         } else {
@@ -475,7 +481,9 @@ export default function TwinLiveScreen() {
               {personSeen
                 ? rppgTrusted
                   ? "rPPG с лица · сидите ровно"
-                  : "Лицо в кадре · лучше при хорошем свете"
+                  : pulseSource === "camera"
+                    ? "rPPG · ранняя оценка, сидите ровно"
+                    : "Лицо в кадре · лучше при хорошем свете"
                 : "Встаньте в кадр для трекинга"}
             </p>
           </div>
