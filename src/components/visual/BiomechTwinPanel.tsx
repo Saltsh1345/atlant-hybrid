@@ -37,13 +37,13 @@ export default function BiomechTwinPanel({
   live = false,
 }: BiomechTwinPanelProps) {
   const { asset, ready, error: assetError } = useAvatarAsset();
-  const fat = latchedBody?.fatPercent ?? 22;
-  const muscle = latchedBody?.musclePercent ?? 42;
   const compositionKnown = locked && !!latchedBody;
-  const fatZones = useMemo(
-    () => fatZonesFromPercent(fat, latchedBody?.fatZones),
-    [fat, latchedBody?.fatZones]
-  );
+  const fat = compositionKnown ? latchedBody!.fatPercent : undefined;
+  const muscle = compositionKnown ? latchedBody!.musclePercent : undefined;
+  const fatZones = useMemo(() => {
+    if (!compositionKnown || fat == null) return undefined;
+    return fatZonesFromPercent(fat, latchedBody?.fatZones);
+  }, [compositionKnown, fat, latchedBody?.fatZones]);
   const poseLinked = !!landmarks?.length;
 
   const criticalMeshes = useMemo(() => {
@@ -132,19 +132,21 @@ export default function BiomechTwinPanel({
                 ? "Критично"
                 : "В сети"}
           </div>
-          {compositionKnown && (
+          {compositionKnown && fat != null && muscle != null && (
             <>
               <div
-                className={`atlant-hud-tag absolute bottom-3 left-3 z-10 ${
+                className={`atlant-hud-tag absolute bottom-3 left-3 z-10 border-[rgba(251,191,120,0.45)] text-[rgb(253,186,116)] ${
                   calm ? "atlant-hud-tag--calm" : ""
                 }`}
+                title="Тёплый персиковый тон на животе и бёдрах = жировые зоны"
               >
                 Жир {fat}%
               </div>
               <div
-                className={`atlant-hud-tag absolute bottom-3 right-3 z-10 ${
+                className={`atlant-hud-tag absolute bottom-3 right-3 z-10 border-[rgba(34,211,238,0.5)] text-cyan-300 ${
                   calm ? "atlant-hud-tag--calm" : ""
                 }`}
+                title="Циан и контур = мышечная масса"
               >
                 Мышцы {muscle}%
               </div>
@@ -161,7 +163,9 @@ export default function BiomechTwinPanel({
                 calm ? "atlant-hud-tag--calm" : ""
               }`}
             >
-              {calm ? "Пройдите скан для точного состава" : "Ожидание скана"}
+              {calm
+                ? "Нейтральный twin · пройдите скан"
+                : "Нейтральный twin · ожидание скана"}
             </div>
           )}
         </>

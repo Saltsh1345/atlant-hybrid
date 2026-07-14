@@ -106,7 +106,7 @@ function SceneAvatar({
     criticalMats.current = [];
 
     const critical = criticalMeshes ?? [];
-    // Always hologram wire twin — materials are unlit cyan mesh
+    // Hologram twin: composition paint only when scan is latched
     if (critical.length > 0) {
       applyCriticalMuscleMaterials(prepared.object, critical, {
         fatPercent,
@@ -126,10 +126,8 @@ function SceneAvatar({
       );
     } else {
       applyHologramTwinMaterials(prepared.object, {
-        fatPercent: fatPercent ?? 0,
-        musclePercent: musclePercent ?? 42,
-        fatZones,
         ghost: ghostMode,
+        compositionKnown: false,
       });
     }
 
@@ -457,11 +455,23 @@ export default function AvatarViewerInner({
         resize={{ scroll: false, debounce: 100 }}
       >
         {!transparentBackground && <color attach="background" args={["#000000"]} />}
-        <ambientLight intensity={ghostMode ? 0.02 : 0.05} />
+        <ambientLight intensity={ghostMode ? 0.04 : compositionMode ? 0.12 : 0.08} />
         <pointLight
           position={[0, 1.6, 2]}
-          intensity={hasAlert ? 0.25 : ghostMode ? 0.06 : 0.12}
+          intensity={
+            hasAlert ? 0.28 : ghostMode ? 0.08 : compositionMode ? 0.22 : 0.16
+          }
           color={hasAlert ? "#f87171" : "#7dd3fc"}
+        />
+        <pointLight
+          position={[-1.2, 1.1, -0.8]}
+          intensity={ghostMode ? 0.03 : 0.1}
+          color="#94a3b8"
+        />
+        <pointLight
+          position={[1.4, 0.6, 1.2]}
+          intensity={ghostMode ? 0.02 : compositionMode ? 0.09 : 0.06}
+          color="#fcd34d"
         />
         <AvatarFloorGrid pulse={hasAlert || !!calmLighting} subtle={ghostMode} />
         <Suspense fallback={<AvatarLoader />}>

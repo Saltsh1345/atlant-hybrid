@@ -7,11 +7,13 @@ import {
 import type { FatZoneMap } from "@/types";
 
 /**
- * Reference-matched hologram twin:
- * - Uniform body grid spacing (triplanar on surface — NOT mesh triangle edges)
- * - Soft white-cyan luminous silhouette
- * - Smooth mannequin face
- * Muscle/fat still driven by named meshes + paint amounts.
+ * Body-composition hologram twin
+ * --------------------------------------------------------------
+ * Fat: soft peach / amber wash on abdomen, hips, thighs, chest —
+ *      scaled by fatZones. Never solid orange blobs / fat_* meshes.
+ * Muscle: cooler cyan + stronger rim / grid on primary movers,
+ *         intensity scales with muscle %.
+ * Neutral: no latched scan → even mannequin, no fake composition paint.
  */
 
 const MESH_FAT_ZONE: Record<string, keyof FatZoneMap> = {
@@ -40,7 +42,35 @@ const MESH_FAT_ZONE: Record<string, keyof FatZoneMap> = {
   forearms_r: "arms",
 };
 
-/** Cell size in model meters — ~even spacing like the reference image */
+/** Relative muscle-definition weight for named groups (0–1). */
+const MESH_MUSCLE_DEF: Record<string, number> = {
+  abs_c: 1,
+  abs_l: 0.95,
+  abs_r: 0.95,
+  chest_l: 1,
+  chest_r: 1,
+  shoulders_l: 0.95,
+  shoulders_r: 0.95,
+  biceps_l: 0.9,
+  biceps_r: 0.9,
+  triceps_l: 0.85,
+  triceps_r: 0.85,
+  quadriceps_l: 0.95,
+  quadriceps_r: 0.95,
+  glutes_c: 0.85,
+  glutes_l: 0.8,
+  glutes_r: 0.8,
+  hamstrings_l: 0.8,
+  hamstrings_r: 0.8,
+  back_c: 0.9,
+  back_l: 0.85,
+  back_r: 0.85,
+  calves_l: 0.7,
+  calves_r: 0.7,
+  forearms_l: 0.55,
+  forearms_r: 0.55,
+};
+
 const GRID_CELL = 0.026;
 const GRID_LINE = 0.0015;
 
@@ -69,53 +99,67 @@ function isFaceMesh(name: string): boolean {
   return n.startsWith("head") || n.startsWith("neck");
 }
 
-function resolveFatAmt(
-  meshName: string,
-  fatPercent: number,
-  fatZones?: FatZoneMap
-): number {
-  const n = normalizeMeshName(meshName);
-  const zoneKey = MESH_FAT_ZONE[n];
-  if (!zoneKey) return 0;
-  if (fatZones) {
-    const amt = fatZones[zoneKey] ?? 0;
-    if (zoneKey === "arms") return 0;
-    return amt;
-  }
-  if (fatPercent <= 0) return 0;
-  const base = Math.min(0.7, fatPercent / 38);
-  if (zoneKey === "abdomen") return base;
-  if (zoneKey === "hips") return base * 0.85;
-  if (zoneKey === "thighs") return base * 0.55;
-  if (zoneKey === "chest" || zoneKey === "back") return base * 0.4;
-  return 0;
-}
-
 function fatZoneKey(meshName: string): keyof FatZoneMap | undefined {
   return MESH_FAT_ZONE[normalizeMeshName(meshName)];
 }
 
-/** Strong warm highlight — only belly & hips, never arms. */
-function isPrimaryFatHighlight(
-  zoneKey: keyof FatZoneMap | undefined,
-  amt: number
-): boolean {
-  if (!zoneKey || zoneKey === "arms") return false;
-  if (zoneKey === "abdomen") return amt >= 0.28;
-  if (zoneKey === "hips") return amt >= 0.22;
-  return false;
+/**
+ * Soft fat amount for a muscle mesh. Arms stay near-zero so limbs
+ * don't read as "fat blobs". Returns 0 when composition is unknown.
+ */
+function resolveFatAmt(
+  meshName: string,
+  fatPercent: number,
+  fatZones?: FatZoneMap,
+  compositionKnown = true
+): number {
+  if (!compositionKnown || fatPercent <= 0) return 0;
+  const n = normalizeMeshName(meshName);
+  const zoneKey = MESH_FAT_ZONE[n];
+  if (!zoneKey) return 0;
+  if (zoneKey === "arms") return 0;
+
+  const zoneAmt = fatZones?.[zoneKey];
+  if (zoneAmt != null) {
+    // Soft curve — keep mid/high fat readable without clipping to solid paint
+    return Math.min(0.92, Math.pow(Math.max(0, zoneAmt), 0.9));
+  }
+
+  const base = Math.min(0.75, fatPercent / 36);
+  if (zoneKey === "abdomen") return base;
+  if (zoneKey === "hips") return base * 0.8;
+  if (zoneKey === "thighs") return base * 0.5;
+  if (zoneKey === "chest" || zoneKey === "back") return base * 0.35;
+  return 0;
+}
+
+function resolveMuscleDef(meshName: string, muscleBoost: number): number {
+  const n = normalizeMeshName(meshName);
+  if (isFaceMesh(n)) return muscleBoost * 0.2;
+  const local = MESH_MUSCLE_DEF[n] ?? 0.35;
+  return Math.min(1, muscleBoost * (0.45 + local * 0.55));
+}
+
+/** Abdomen/hips get a soft "primary depot" flag (shader uses as boost, not binary paint). */
+function isPrimaryFatDepot(zoneKey: keyof FatZoneMap | undefined): boolean {
+  return zoneKey === "abdomen" || zoneKey === "hips";
 }
 
 const hologramVert = /* glsl */ `
+  uniform float uFat;
+  uniform float uFatDepot;
   varying vec3 vPos;
   varying vec3 vNormal;
   varying vec3 vView;
   void main() {
-    vec4 world = modelMatrix * vec4(position, 1.0);
-    vPos = position;
+    // Soft volume cue: slightly expand high-fat depot meshes along normals
+    float inflate = uFat * mix(0.004, 0.011, uFatDepot);
+    vec3 pos = position + normal * inflate;
+    vec4 world = modelMatrix * vec4(pos, 1.0);
+    vPos = pos;
     vNormal = normalize(mat3(modelMatrix) * normal);
     vView = normalize(cameraPosition - world.xyz);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   }
 `;
 
@@ -124,10 +168,11 @@ const hologramFrag = /* glsl */ `
   uniform float uLineWidth;
   uniform float uFace;
   uniform float uFat;
-  uniform float uFatZone;
+  uniform float uFatDepot;
   uniform float uMuscle;
   uniform float uCritical;
   uniform float uGhost;
+  uniform float uComposition;
   uniform float uTime;
 
   varying vec3 vPos;
@@ -139,75 +184,77 @@ const hologramFrag = /* glsl */ `
     return 1.0 - smoothstep(0.0, w / cell, g);
   }
 
-  // Uniform spaced grid on body surface (triplanar) — spacing independent of triangle edges
   float bodyGrid(vec3 p, vec3 n, float cell, float w) {
     vec3 an = abs(normalize(n));
     float gx = gridLine1D(p.x, cell, w);
     float gy = gridLine1D(p.y, cell, w);
     float gz = gridLine1D(p.z, cell, w);
-    // Blend by normal so lines wrap evenly on torso/limbs
     float g = gx * an.x + gy * an.y + gz * an.z;
-    // Keep strongest axis contribution for crisp regular look
     float m = max(gx * step(0.45, an.x), max(gy * step(0.45, an.y), gz * step(0.45, an.z)));
     return max(g * 0.65, m);
   }
 
   void main() {
     vec3 n = normalize(vNormal);
-    float fresnel = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 2.2);
+    float fresnel = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 2.15);
 
     float cell = mix(uGridCell, uGridCell * 0.85, uFace);
     float lineW = mix(uLineWidth, uLineWidth * 0.7, uFace);
     float grid = bodyGrid(vPos, n, cell, lineW);
 
-    // Base luminous fill — soft white-cyan like reference (figure is the light)
-    vec3 core = mix(vec3(0.55, 0.82, 0.98), vec3(0.92, 0.97, 1.0), 0.55);
-    vec3 rim = vec3(0.75, 0.92, 1.0);
+    // Neutral luminous mannequin — soft cool cyan-white
+    vec3 core = mix(vec3(0.52, 0.78, 0.94), vec3(0.90, 0.96, 1.0), 0.52);
+    vec3 rim = vec3(0.72, 0.90, 1.0);
 
-    // Muscle % → brighter cyan core
-    core = mix(core, vec3(0.35, 0.85, 1.0), uMuscle * 0.35);
+    // Muscle definition: cooler core + tighter rim/grid on primary movers
+    float m = clamp(uMuscle, 0.0, 1.0);
+    core = mix(core, vec3(0.22, 0.78, 0.98), m * 0.48);
+    rim = mix(rim, vec3(0.45, 0.92, 1.0), m * 0.55);
+    float gridAmt = mix(grid, grid * 0.55, uFace);
+    gridAmt *= (1.0 + m * 0.42);
 
     if (uCritical > 0.5) {
       if (uGhost > 0.5) {
-        core = mix(core, vec3(1.0, 0.52, 0.18), 0.55);
-        rim = vec3(1.0, 0.72, 0.35);
+        core = mix(core, vec3(1.0, 0.55, 0.28), 0.45);
+        rim = vec3(1.0, 0.75, 0.4);
       } else {
-        core = vec3(1.0, 0.35, 0.35);
-        rim = vec3(1.0, 0.65, 0.65);
+        core = vec3(1.0, 0.38, 0.38);
+        rim = vec3(1.0, 0.68, 0.68);
       }
     }
 
-    // Face: smoother mannequin — softer grid, more fill glow
-    float faceSoft = uFace;
-    float gridAmt = mix(grid, grid * 0.55, faceSoft);
+    float pulse = 0.975 + 0.025 * sin(uTime * 1.5);
 
-    float pulse = 0.97 + 0.03 * sin(uTime * 1.6);
-
-    // Primary fat zones — warm tint on hologram (belly, glutes), not solid blobs
-    if (uFatZone > 0.5) {
-      core = mix(core, vec3(1.0, 0.42, 0.02), 0.72);
-      rim = mix(rim, vec3(1.0, 0.68, 0.12), 0.62);
-    } else if (uFat > 0.08) {
-      float fatTint = clamp(uFat * 0.7, 0.0, 0.38);
-      core = mix(core, vec3(1.0, 0.52, 0.08), fatTint);
-      rim = mix(rim, vec3(1.0, 0.78, 0.28), fatTint * 0.45);
+    // Fat: soft peach/amber wash — proportional, never solid orange fill
+    if (uComposition > 0.5 && uFat > 0.04) {
+      float fatSoft = smoothstep(0.04, 0.88, uFat);
+      // Depot regions (belly/hips) get a bit more warmth; still translucent
+      float warmth = fatSoft * mix(0.16, 0.34, uFatDepot);
+      // Vertical bias: lower part of mesh slightly warmer (soft belly cue)
+      float yBias = smoothstep(0.35, -0.55, vPos.y) * 0.12 * uFatDepot;
+      warmth = clamp(warmth + yBias, 0.0, 0.42);
+      vec3 fatCol = vec3(0.98, 0.74, 0.48); // peach, not neon orange
+      vec3 fatRim = vec3(1.0, 0.82, 0.55);
+      core = mix(core, fatCol, warmth);
+      rim = mix(rim, fatRim, warmth * 0.55);
+      // Fat softens muscle grid slightly so depot reads as softer tissue
+      gridAmt *= (1.0 - warmth * 0.35);
     }
 
-    vec3 col = core * (0.55 + 0.25 * fresnel) * pulse;
-    col += rim * fresnel * 0.85;
-    col += vec3(0.65, 0.9, 1.0) * gridAmt * mix(0.95, 0.45, faceSoft);
+    vec3 col = core * (0.52 + 0.28 * fresnel) * pulse;
+    col += rim * fresnel * (0.78 + m * 0.5);
+    col += vec3(0.62, 0.88, 1.0) * gridAmt * mix(0.92, 0.42, uFace);
 
-    // Soft body opacity — denser at rim, translucent center like hologram scan
-    float alpha = mix(0.42, 0.78, fresnel) + gridAmt * 0.35;
-    alpha = mix(alpha, 0.55 + fresnel * 0.3 + gridAmt * 0.2, faceSoft);
+    float alpha = mix(0.40, 0.80, fresnel) + gridAmt * 0.32 + m * 0.06;
+    alpha = mix(alpha, 0.52 + fresnel * 0.28 + gridAmt * 0.18, uFace);
 
     if (uGhost > 0.5) {
-      col = mix(vec3(0.18, 0.52, 0.72), col, 0.28 + gridAmt * 0.42);
-      col += vec3(0.45, 0.82, 1.0) * gridAmt * 0.55;
+      col = mix(vec3(0.16, 0.48, 0.68), col, 0.30 + gridAmt * 0.4);
+      col += vec3(0.42, 0.80, 1.0) * gridAmt * 0.5;
       alpha = mix(0.1, 0.36, gridAmt + fresnel * 0.25);
       alpha = clamp(alpha, 0.08, 0.42);
     } else {
-      alpha = clamp(alpha, 0.35, 0.92);
+      alpha = clamp(alpha, 0.34, 0.93);
     }
 
     gl_FragColor = vec4(col, alpha);
@@ -217,10 +264,11 @@ const hologramFrag = /* glsl */ `
 function makeHologramMaterial(opts: {
   face: boolean;
   fatAmt: number;
-  fatZone?: boolean;
+  fatDepot: boolean;
   muscleBoost: number;
   critical: boolean;
   ghost?: boolean;
+  compositionKnown?: boolean;
 }): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -228,10 +276,11 @@ function makeHologramMaterial(opts: {
       uLineWidth: { value: opts.ghost ? GRID_LINE * 0.85 : GRID_LINE },
       uFace: { value: opts.face ? 1 : 0 },
       uFat: { value: opts.fatAmt },
-      uFatZone: { value: opts.fatZone ? 1 : 0 },
+      uFatDepot: { value: opts.fatDepot ? 1 : 0 },
       uMuscle: { value: opts.muscleBoost },
       uCritical: { value: opts.critical ? 1 : 0 },
       uGhost: { value: opts.ghost ? 1 : 0 },
+      uComposition: { value: opts.compositionKnown ? 1 : 0 },
       uTime: { value: 0 },
     },
     vertexShader: hologramVert,
@@ -264,125 +313,28 @@ function paintHologramPiece(
     muscleBoost?: number;
     critical?: boolean;
     ghost?: boolean;
+    compositionKnown?: boolean;
   }
 ): void {
   clearBodyGrid(mesh);
   if (mesh.material) disposeMaterial(mesh.material);
   const fatAmt = opts.fatAmt ?? 0;
   const zone = fatZoneKey(mesh.name);
+  const depot = isPrimaryFatDepot(zone) && fatAmt >= 0.18;
   mesh.material = makeHologramMaterial({
     face: !!opts.face,
     fatAmt,
-    fatZone: isPrimaryFatHighlight(zone, fatAmt),
+    fatDepot: depot,
     muscleBoost: opts.muscleBoost ?? 0.5,
     critical: !!opts.critical,
-    ghost: !!opts.ghost,
+    ghost: opts.ghost,
+    compositionKnown: opts.compositionKnown,
   });
   mesh.visible = true;
-  mesh.renderOrder = isPrimaryFatHighlight(zone, fatAmt) ? 2 : opts.face ? 1 : 0;
+  mesh.renderOrder = depot ? 2 : opts.face ? 1 : 0;
 }
 
-function resolveFatMeshAmt(
-  meshName: string,
-  fatZones: FatZoneMap,
-  fatPercent: number
-): number {
-  const n = normalizeMeshName(meshName);
-  if (n === "fat_torso") {
-    return Math.max(fatZones.abdomen, fatZones.chest * 0.65, fatZones.back * 0.45);
-  }
-  if (n.startsWith("fat_leg")) {
-    return Math.max(fatZones.thighs, fatZones.hips * 0.75);
-  }
-  if (n.startsWith("fat_arm")) {
-    return fatZones.arms;
-  }
-  return Math.min(0.75, fatPercent / 36);
-}
-
-const fatLayerVert = /* glsl */ `
-  uniform float uInflate;
-  varying vec3 vNormal;
-  varying vec3 vView;
-  void main() {
-    vec3 pos = position + normal * uInflate;
-    vec4 world = modelMatrix * vec4(pos, 1.0);
-    vNormal = normalize(mat3(modelMatrix) * normal);
-    vView = normalize(cameraPosition - world.xyz);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-  }
-`;
-
-const fatLayerFrag = /* glsl */ `
-  uniform float uFat;
-  uniform float uTime;
-  varying vec3 vNormal;
-  varying vec3 vView;
-
-  void main() {
-    vec3 n = normalize(vNormal);
-    float fresnel = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 1.6);
-    float pulse = 0.92 + 0.08 * sin(uTime * 1.4);
-    vec3 core = vec3(1.0, 0.35, 0.0) * pulse;
-    vec3 rim = vec3(1.0, 0.68, 0.1);
-    vec3 col = mix(core, rim, fresnel * 0.9);
-    float alpha = clamp((0.22 + uFat * 0.35) * (0.55 + fresnel * 0.35), 0.15, 0.55);
-    gl_FragColor = vec4(col, alpha);
-  }
-`;
-
-function makeFatLayerMaterial(fatAmt: number): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uFat: { value: fatAmt },
-      uInflate: { value: 0.012 },
-      uTime: { value: 0 },
-    },
-    vertexShader: fatLayerVert,
-    fragmentShader: fatLayerFrag,
-    transparent: true,
-    depthWrite: false,
-    depthTest: true,
-    side: THREE.DoubleSide,
-    blending: THREE.NormalBlending,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-  });
-}
-
-function paintFatLayer(mesh: THREE.Mesh, fatAmt: number): void {
-  clearBodyGrid(mesh);
-  if (mesh.material) disposeMaterial(mesh.material);
-  mesh.material = makeFatLayerMaterial(fatAmt);
-  mesh.visible = true;
-  mesh.renderOrder = 12;
-}
-
-function applyFatLayers(
-  root: THREE.Object3D,
-  fatZones: FatZoneMap,
-  fatPercent: number,
-  show: boolean
-): void {
-  root.traverse((child) => {
-    if (!(child as THREE.Mesh).isMesh) return;
-    const mesh = child as THREE.Mesh;
-    if (classifyAvatarMesh(mesh.name) !== "fat") return;
-    if (!show || fatPercent <= 0) {
-      mesh.visible = false;
-      clearBodyGrid(mesh);
-      return;
-    }
-    const amt = resolveFatMeshAmt(mesh.name, fatZones, fatPercent);
-    if (amt < 0.04) {
-      mesh.visible = false;
-      return;
-    }
-    paintFatLayer(mesh, Math.min(1, amt * 1.2));
-  });
-}
-
+/** Capsule fat_* meshes look like orange blobs — always hide. */
 function hideFatCapsules(root: THREE.Object3D): void {
   root.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
@@ -401,14 +353,23 @@ export function applyHologramTwinMaterials(
     musclePercent?: number;
     fatZones?: FatZoneMap;
     ghost?: boolean;
-    showFatLayers?: boolean;
+    /** When false/undefined, paint neutral twin (no fat warmth, moderate muscle). */
+    compositionKnown?: boolean;
   }
 ): void {
-  const fatPercent = opts?.fatPercent ?? 0;
-  const musclePercent = opts?.musclePercent ?? 42;
-  const muscleBoost = Math.min(1, Math.max(0.25, musclePercent / 55));
-  const zones = fatZonesFromPercent(fatPercent, opts?.fatZones);
-  // Fat capsule meshes (fat_torso, fat_arm…) look like blobs — tint muscles only.
+  const compositionKnown = opts?.compositionKnown === true;
+  const fatPercent = compositionKnown ? (opts?.fatPercent ?? 0) : 0;
+  const musclePercent = compositionKnown
+    ? (opts?.musclePercent ?? 42)
+    : 40;
+  // Neutral: mild definition; known scan: scale 28–58% muscle → ~0.35–1.0
+  const muscleBoost = compositionKnown
+    ? Math.min(1, Math.max(0.28, (musclePercent - 22) / 36))
+    : 0.42;
+  const zones = compositionKnown
+    ? fatZonesFromPercent(fatPercent, opts?.fatZones)
+    : undefined;
+
   hideFatCapsules(root);
 
   root.traverse((child) => {
@@ -424,9 +385,10 @@ export function applyHologramTwinMaterials(
 
     paintHologramPiece(mesh, {
       face: isFaceMesh(mesh.name),
-      fatAmt: resolveFatAmt(mesh.name, fatPercent, zones),
-      muscleBoost,
+      fatAmt: resolveFatAmt(mesh.name, fatPercent, zones, compositionKnown),
+      muscleBoost: resolveMuscleDef(mesh.name, muscleBoost),
       ghost: opts?.ghost,
+      compositionKnown,
     });
   });
 }
@@ -459,6 +421,7 @@ export function applyCompositionVertexMaterials(
     musclePercent,
     fatZones: zones,
     ghost: _opts?.ghost,
+    compositionKnown: true,
   });
 }
 
@@ -475,14 +438,14 @@ export function applyCriticalMuscleMaterials(
   }
 ): void {
   const critical = new Set(criticalMeshes.map((n) => normalizeMeshName(n)));
+  const compositionKnown = opts?.compositionKnown === true;
 
   applyHologramTwinMaterials(root, {
-    fatPercent: opts?.compositionKnown
-      ? (opts.fatPercent ?? 22)
-      : opts?.fatPercent,
+    fatPercent: compositionKnown ? (opts?.fatPercent ?? 22) : undefined,
     musclePercent: opts?.musclePercent ?? 42,
     fatZones: opts?.fatZones,
     ghost: opts?.ghost,
+    compositionKnown,
   });
 
   root.traverse((child) => {
@@ -494,6 +457,7 @@ export function applyCriticalMuscleMaterials(
       critical: true,
       muscleBoost: 1,
       ghost: opts?.ghost,
+      compositionKnown,
     });
   });
 }

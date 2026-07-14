@@ -55,7 +55,7 @@ export default function DigitalTwinCard({
               : !available
                 ? "Добавьте avatar.glb в public/"
                 : calm
-                  ? "Голограмма · мышцы и жир активны"
+                  ? "Нейтральная голограмма · скан покажет жир и мышцы"
                   : "Пройдите скан для фиксации состава"}
           </p>
           )}
