@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { POSE_CONNECTIONS } from "@/lib/pose/landmarks";
 import type { NormalizedLandmark } from "@/types";
+
+/** Overlay redraw cadence when driven by landmarksRef (no parent setState). */
+const REF_DRAW_MS = 200;
 
 function tensionColor(tension: number): string {
   if (tension < 0.35) return "#22c55e";
@@ -11,13 +19,16 @@ function tensionColor(tension: number): string {
 }
 
 export default function PoseOverlay({
-  landmarks,
+  landmarks: landmarksProp = null,
+  landmarksRef,
   mirrored = true,
   tension = 0,
   mode = "training",
   motionDir = "",
 }: {
-  landmarks: NormalizedLandmark[] | null;
+  landmarks?: NormalizedLandmark[] | null;
+  /** Prefer this on live screens — avoids putting landmark arrays in parent React state. */
+  landmarksRef?: RefObject<NormalizedLandmark[] | null>;
   mirrored?: boolean;
   tension?: number;
   mode?: "training" | "calibration";
@@ -27,9 +38,46 @@ export default function PoseOverlay({
   const prevRef = useRef<{ x: number; y: number } | null>(null);
   const velRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const [gridPulse, setGridPulse] = useState(0);
+  const [refLandmarks, setRefLandmarks] = useState<NormalizedLandmark[] | null>(
+    null
+  );
+  const lastDrawAtRef = useRef(0);
+  const hadLmRef = useRef(false);
 
+  // Ref-driven path: local throttled redraw only — never feeds back to parent.
   useEffect(() => {
-    if (!landmarks) return;
+    if (!landmarksRef) return;
+    let raf = 0;
+    let alive = true;
+
+    const loop = () => {
+      if (!alive) return;
+      const lm = landmarksRef.current;
+      const now = performance.now();
+      const present = !!lm;
+      const presenceChanged = present !== hadLmRef.current;
+      const due = now - lastDrawAtRef.current >= REF_DRAW_MS;
+
+      if (presenceChanged || (present && due)) {
+        hadLmRef.current = present;
+        lastDrawAtRef.current = now;
+        setRefLandmarks(lm);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+
+    raf = requestAnimationFrame(loop);
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+    };
+  }, [landmarksRef]);
+
+  const landmarks = landmarksRef ? refLandmarks : landmarksProp;
+
+  // Calibration-only motion cue — do not setState on every training landmark update.
+  useEffect(() => {
+    if (mode !== "calibration" || !landmarks) return;
     const lw = landmarks[15];
     const rw = landmarks[16];
     const wrist = (lw?.visibility ?? 0) > (rw?.visibility ?? 0) ? lw : rw;
@@ -43,7 +91,7 @@ export default function PoseOverlay({
       if (speed > 0.002) setGridPulse((p) => (p + 1) % 1000);
     }
     prevRef.current = { x: wrist.x, y: wrist.y };
-  }, [landmarks]);
+  }, [landmarks, mode]);
 
   if (!landmarks) return null;
 

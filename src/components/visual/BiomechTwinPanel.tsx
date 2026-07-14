@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import AvatarViewer from "@/components/three/AvatarViewer";
 import { useAvatarAsset } from "@/hooks/useAvatarAsset";
 import { fatZonesFromPercent } from "@/lib/body/fatZones";
@@ -17,6 +17,8 @@ interface BiomechTwinPanelProps {
   lastSession?: SessionSummary | null;
   criticalMeshes?: string[];
   landmarks?: NormalizedLandmark[] | null;
+  /** Live twin: pose from ref (no landmark React state in parent). */
+  landmarksRef?: RefObject<NormalizedLandmark[] | null>;
   /** Soft dashboard look: no wireframe, no red “critical” scare, calm HUD */
   calm?: boolean;
   /** Live twin screen: side panel that tracks pose from camera */
@@ -33,6 +35,7 @@ export default function BiomechTwinPanel({
   lastSession = null,
   criticalMeshes: criticalOverride,
   landmarks = null,
+  landmarksRef,
   calm = false,
   live = false,
 }: BiomechTwinPanelProps) {
@@ -44,7 +47,8 @@ export default function BiomechTwinPanel({
     if (!compositionKnown || fat == null) return undefined;
     return fatZonesFromPercent(fat, latchedBody?.fatZones);
   }, [compositionKnown, fat, latchedBody?.fatZones]);
-  const poseLinked = !!landmarks?.length;
+  // Live + ref: always pose-driven in useFrame (DEFAULT_RIG when empty).
+  const poseLinked = live ? !!landmarksRef : !!landmarks?.length;
 
   const criticalMeshes = useMemo(() => {
     if (criticalOverride?.length) return criticalOverride;
@@ -186,7 +190,8 @@ export default function BiomechTwinPanel({
             musclePercent={muscle}
             fatZones={fatZones}
             criticalMeshes={criticalMeshes}
-            landmarks={landmarks}
+            landmarks={landmarksRef ? null : landmarks}
+            landmarksRef={landmarksRef}
             idleAnimate={live ? !poseLinked : true}
             theme="dark"
             fillHeight

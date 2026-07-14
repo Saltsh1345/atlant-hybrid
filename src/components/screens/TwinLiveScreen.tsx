@@ -60,9 +60,7 @@ function TwinVitalCard({
   );
 }
 
-/** Pose / HUD refresh — keep c8fbcc8 style throttling to avoid max-update-depth */
-const UI_MS = 150;
-/** Vitals (pulse/stress) can update a bit slower — still feels live */
+/** Vitals (pulse/stress) UI — throttle so setState never rebinds the rAF loop */
 const VITALS_MS = 500;
 
 function pulseHint(
@@ -89,8 +87,8 @@ function stressHint(
 
 export default function TwinLiveScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** Pose landmarks live only in a ref — never in React state (fixes max update depth). */
   const landmarksRef = useRef<NormalizedLandmark[] | null>(null);
-  const [landmarks, setLandmarks] = useState<NormalizedLandmark[] | null>(null);
   const [pulseBpm, setPulseBpm] = useState(72);
   const [stressLevel, setStressLevel] = useState(35);
   const [personSeen, setPersonSeen] = useState(false);
@@ -100,7 +98,6 @@ export default function TwinLiveScreen() {
   );
 
   const personSeenRef = useRef(false);
-  const lastUiAtRef = useRef(0);
   const lastVitalsAtRef = useRef(0);
   const pulseBpmRef = useRef(72);
   const stressLevelRef = useRef(35);
@@ -199,7 +196,6 @@ export default function TwinLiveScreen() {
       if (!alive) return;
       const lm = tickRef.current();
       const now = performance.now();
-      const dueUi = now - lastUiAtRef.current >= UI_MS;
       const dueVitals = now - lastVitalsAtRef.current >= VITALS_MS;
 
       if (lm) {
@@ -258,11 +254,6 @@ export default function TwinLiveScreen() {
           setPersonSeen(true);
         }
 
-        if (dueUi) {
-          lastUiAtRef.current = now;
-          setLandmarks(lm);
-        }
-
         if (dueVitals) {
           lastVitalsAtRef.current = now;
           publishVitals(nextBpm, nextStress, nextSource, "live");
@@ -292,11 +283,7 @@ export default function TwinLiveScreen() {
 
         if (personSeenRef.current) {
           personSeenRef.current = false;
-          if (dueUi) {
-            lastUiAtRef.current = now;
-            setPersonSeen(false);
-            setLandmarks(null);
-          }
+          setPersonSeen(false);
         }
 
         if (dueVitals && vitalsDisplayRef.current !== "none") {
@@ -381,7 +368,7 @@ export default function TwinLiveScreen() {
               locked={bodyDataLocked}
               lastSession={lastSession}
               criticalMeshes={criticalMeshes}
-              landmarks={landmarks}
+              landmarksRef={landmarksRef}
               live
               showHud
               calm
@@ -406,7 +393,7 @@ export default function TwinLiveScreen() {
             poseReady={poseReady}
             poseError={poseError}
           />
-          <PoseOverlay landmarks={landmarks} />
+          <PoseOverlay landmarksRef={landmarksRef} />
 
           <div className="pointer-events-none absolute left-3 top-3 z-20 rounded-lg border border-white/15 bg-black/55 px-2.5 py-1.5 backdrop-blur-sm">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300/90">

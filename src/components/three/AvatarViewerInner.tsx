@@ -1,6 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  type RefObject,
+} from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
@@ -124,9 +130,18 @@ function applyStaticPose(group: THREE.Object3D, rig: RigPose, lerp = 0.2): void 
   group.position.y = THREE.MathUtils.lerp(group.position.y, -squat * 0.08, lerp * 0.6);
 }
 
+function resolveRig(
+  rig: RigPose,
+  landmarksRef?: RefObject<NormalizedLandmark[] | null>
+): RigPose {
+  if (!landmarksRef) return rig;
+  return landmarksToRig(landmarksRef.current) ?? DEFAULT_RIG;
+}
+
 function SceneAvatar({
   scene,
   rig,
+  landmarksRef,
   compositionMode,
   fatPercent,
   musclePercent,
@@ -139,6 +154,7 @@ function SceneAvatar({
 }: {
   scene: THREE.Object3D;
   rig: RigPose;
+  landmarksRef?: RefObject<NormalizedLandmark[] | null>;
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
@@ -160,6 +176,9 @@ function SceneAvatar({
   const groupRef = useRef<THREE.Group>(null);
   const bonesRef = useRef<ReturnType<typeof findBones>>(new Map());
   const criticalMats = useRef<THREE.MeshStandardMaterial[]>([]);
+  const rigRef = useRef(rig);
+  rigRef.current = rig;
+  const landmarksRefStable = landmarksRef;
   const rigged = useMemo(
     () => (prepared ? hasRiggedSkeleton(prepared.object) : false),
     [prepared]
@@ -229,7 +248,9 @@ function SceneAvatar({
 
     tickHologramMaterials(prepared.object, clock.getElapsedTime());
 
-    if (idleAnimate && !rigged && !ghostMode) {
+    const frameRig = resolveRig(rigRef.current, landmarksRefStable);
+
+    if (idleAnimate && !rigged && !ghostMode && !landmarksRefStable?.current) {
       const t = clock.getElapsedTime();
       groupRef.current.rotation.y = Math.sin(t * 0.28) * 0.08;
       groupRef.current.position.y =
@@ -237,9 +258,9 @@ function SceneAvatar({
     }
 
     if (rigged && bonesRef.current.size > 2) {
-      applyRigToBones(bonesRef.current, rig);
-    } else if (!idleAnimate) {
-      applyStaticPose(groupRef.current, rig);
+      applyRigToBones(bonesRef.current, frameRig);
+    } else if (!idleAnimate || landmarksRefStable?.current) {
+      applyStaticPose(groupRef.current, frameRig);
     }
 
     for (const mat of criticalMats.current) {
@@ -250,7 +271,7 @@ function SceneAvatar({
   });
 
   if (!hasMesh || !prepared) {
-    return <PoseDrivenAvatar rig={rig} />;
+    return <PoseDrivenAvatar rig={rig} landmarksRef={landmarksRefStable} />;
   }
 
   return (
@@ -302,17 +323,22 @@ function FbxModel({
 
 export function PoseDrivenAvatar({
   rig,
+  landmarksRef,
 }: {
   rig: RigPose;
+  landmarksRef?: RefObject<NormalizedLandmark[] | null>;
 }) {
   const torsoRef = useRef<THREE.Group>(null);
   const current = useRef<RigPose>({ ...DEFAULT_RIG });
+  const rigRef = useRef(rig);
+  rigRef.current = rig;
 
   useFrame(() => {
+    const target = resolveRig(rigRef.current, landmarksRef);
     const c = current.current;
     const t = 0.25;
     (Object.keys(DEFAULT_RIG) as (keyof RigPose)[]).forEach((key) => {
-      c[key] += (rig[key] - c[key]) * t;
+      c[key] += (target[key] - c[key]) * t;
     });
     if (torsoRef.current) torsoRef.current.rotation.z = c.torsoLean;
   });
@@ -353,6 +379,7 @@ function AvatarLoader() {
 function AvatarScene({
   asset,
   rig,
+  landmarksRef,
   compositionMode,
   fatPercent,
   musclePercent,
@@ -365,6 +392,7 @@ function AvatarScene({
 }: {
   asset: AvatarAsset | null;
   rig: RigPose;
+  landmarksRef?: RefObject<NormalizedLandmark[] | null>;
   compositionMode?: boolean;
   fatPercent?: number;
   musclePercent?: number;
@@ -379,13 +407,14 @@ function AvatarScene({
     if (!asset) onModelKind?.("procedural");
   }, [asset, onModelKind]);
 
-  if (!asset) return <PoseDrivenAvatar rig={rig} />;
+  if (!asset) return <PoseDrivenAvatar rig={rig} landmarksRef={landmarksRef} />;
 
   if (asset.format === "fbx") {
     return (
       <FbxModel
         url={asset.url}
         rig={rig}
+        landmarksRef={landmarksRef}
         compositionMode={compositionMode}
         fatPercent={fatPercent}
         musclePercent={musclePercent}
@@ -403,6 +432,7 @@ function AvatarScene({
     <GlbModel
       url={asset.url}
       rig={rig}
+      landmarksRef={landmarksRef}
       compositionMode={compositionMode}
       fatPercent={fatPercent}
       musclePercent={musclePercent}
@@ -432,6 +462,8 @@ export interface AvatarViewerInnerProps {
   criticalMeshes?: string[];
   idleAnimate?: boolean;
   landmarks?: NormalizedLandmark[] | null;
+  /** Live screens: read pose from ref in useFrame — no React landmark state. */
+  landmarksRef?: RefObject<NormalizedLandmark[] | null>;
   theme?: "light" | "dark";
   fillHeight?: boolean;
   /** Softer lights, no red alert flash, lime accent */
@@ -461,6 +493,7 @@ export default function AvatarViewerInner({
   criticalMeshes,
   idleAnimate = true,
   landmarks = null,
+  landmarksRef,
   theme = "dark",
   fillHeight = false,
   calmLighting = false,
@@ -470,9 +503,11 @@ export default function AvatarViewerInner({
   narrowPanelFit = false,
   onModelKind,
 }: AvatarViewerInnerProps) {
+  // Prop landmarks only when no ref — ref path applies pose inside useFrame.
   const rig = useMemo(
-    () => landmarksToRig(landmarks) ?? DEFAULT_RIG,
-    [landmarks]
+    () =>
+      landmarksRef ? DEFAULT_RIG : landmarksToRig(landmarks) ?? DEFAULT_RIG,
+    [landmarks, landmarksRef]
   );
 
   const heightClass = fillHeight
@@ -568,6 +603,7 @@ export default function AvatarViewerInner({
           <AvatarScene
             asset={asset}
             rig={rig}
+            landmarksRef={landmarksRef}
             compositionMode={compositionMode}
             fatPercent={fatPercent}
             musclePercent={musclePercent}
