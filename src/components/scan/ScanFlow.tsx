@@ -12,6 +12,7 @@ import { analyzePoseLive } from "@/lib/calibration/poseAnalysis";
 import { fullBodyProgress } from "@/lib/calibration/scanAnalysis";
 import { buildStageTwoScanResult } from "@/lib/scan/scanResult";
 import {
+  loadStatureFromProfile,
   persistBodyScan,
   saveStatureToProfile,
 } from "@/lib/scan/persistScan";
@@ -57,6 +58,7 @@ export default function ScanFlow() {
   const gateRef = useRef(new StablePoseGate(12));
   const capturePendingRef = useRef(false);
   const [heightInput, setHeightInput] = useState("");
+  const [checkingSavedHeight, setCheckingSavedHeight] = useState(true);
   const [guide, setGuide] = useState<LiveGuide>(EMPTY_GUIDE);
 
   const phase = useScanStore((state) => state.phase);
@@ -83,6 +85,29 @@ export default function ScanFlow() {
     videoRef,
     cameraActive,
   );
+
+  useEffect(() => {
+    let active = true;
+
+    void loadStatureFromProfile()
+      .then((savedStatureCm) => {
+        if (!active || savedStatureCm === null) return;
+        setHeightInput(savedStatureCm.toString());
+        setHealthProfile({ heightCm: savedStatureCm });
+        setStatureCm(savedStatureCm);
+        setPhase("front");
+      })
+      .catch(() => {
+        // The height form keeps its existing authentication error on submit.
+      })
+      .finally(() => {
+        if (active) setCheckingSavedHeight(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [setHealthProfile, setPhase, setStatureCm]);
 
   const finishScan = useCallback(
     async (
@@ -249,6 +274,10 @@ export default function ScanFlow() {
     setGuide(EMPTY_GUIDE);
     setHeightInput(statureCm?.toString() ?? "");
     reset();
+    if (statureCm) {
+      setStatureCm(statureCm);
+      setPhase("front");
+    }
   };
 
   if (phase === "height") {
@@ -260,20 +289,26 @@ export default function ScanFlow() {
           </p>
           <h1 className="mt-4 text-3xl font-semibold">Калибровка масштаба</h1>
           <p className="mt-3 text-sm leading-6 text-zinc-400">
-            Рост нужен для перевода размеров тела из пикселей в сантиметры.
-            Значение сохранится в защищённом профиле.
+            Рост нужен для перевода размеров тела из пикселей в сантиметры и
+            сохраняется в защищённом профиле при первой верификации.
           </p>
 
-          <label className="mt-8 text-xs font-medium tracking-wide text-zinc-400">
-            РОСТ, СМ
-            <input
-              value={heightInput}
-              onChange={(event) => setHeightInput(event.target.value)}
-              inputMode="decimal"
-              placeholder="Например, 178"
-              className="mt-2 w-full rounded-2xl border border-cyan-300/25 bg-zinc-950 px-4 py-4 text-lg text-white outline-none transition focus:border-cyan-300"
-            />
-          </label>
+          {checkingSavedHeight ? (
+            <p className="mt-8 text-sm text-cyan-200">
+              Проверяем сохранённый рост...
+            </p>
+          ) : (
+            <label className="mt-8 text-xs font-medium tracking-wide text-zinc-400">
+              РОСТ, СМ
+              <input
+                value={heightInput}
+                onChange={(event) => setHeightInput(event.target.value)}
+                inputMode="decimal"
+                placeholder="Например, 178"
+                className="mt-2 w-full rounded-2xl border border-cyan-300/25 bg-zinc-950 px-4 py-4 text-lg text-white outline-none transition focus:border-cyan-300"
+              />
+            </label>
+          )}
 
           {error ? (
             <p className="mt-3 text-sm text-rose-300" role="alert">
@@ -284,10 +319,14 @@ export default function ScanFlow() {
           <button
             type="button"
             onClick={() => void startScan()}
-            disabled={saving}
+            disabled={saving || checkingSavedHeight}
             className="mt-6 rounded-2xl bg-cyan-300 px-5 py-4 text-sm font-bold tracking-wide text-black disabled:opacity-50"
           >
-            {saving ? "СОХРАНЕНИЕ..." : "ВКЛЮЧИТЬ КАМЕРУ"}
+            {checkingSavedHeight
+              ? "ПРОВЕРКА ПРОФИЛЯ..."
+              : saving
+                ? "СОХРАНЕНИЕ..."
+                : "ВКЛЮЧИТЬ КАМЕРУ"}
           </button>
           <Link
             href="/"

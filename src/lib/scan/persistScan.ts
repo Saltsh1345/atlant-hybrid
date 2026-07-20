@@ -1,6 +1,30 @@
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import type { StageTwoScanResult } from "@/lib/scan/scanResult";
 
+/** Returns the saved profile stature, if it is valid for scan calibration. */
+export async function loadStatureFromProfile(): Promise<number | null> {
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase) throw new Error("supabase_not_configured");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("authentication_required");
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("height_cm")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const statureCm = Number(data?.height_cm);
+  return Number.isFinite(statureCm) && statureCm >= 140 && statureCm <= 220
+    ? statureCm
+    : null;
+}
+
 export async function saveStatureToProfile(statureCm: number) {
   const supabase = createBrowserSupabaseClient();
   if (!supabase) throw new Error("supabase_not_configured");
