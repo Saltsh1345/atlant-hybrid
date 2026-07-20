@@ -1,0 +1,27 @@
+---
+description: Approved stack and provider constraints
+alwaysApply: true
+---
+
+# Approved Stack
+
+- Next.js 16 and React 19
+- Tailwind CSS 4
+- Zustand
+- React Three Fiber / Three.js
+- MediaPipe Tasks Vision
+- Recharts
+- Supabase for database and application authentication
+- Existing Huawei Health integration
+- Existing Gemini integration
+- Web Bluetooth only when its planned stage is authorized
+
+Rules:
+
+1. Read relevant documentation in `node_modules/next/dist/docs/` before changing Next.js code.
+2. Reuse installed packages and existing modules before adding dependencies.
+3. Do not replace Huawei Health or Gemini.
+4. Google Fit and Apple Health are later optional providers, not replacements.
+5. Do not add another database, auth framework, state library, chart library, or AI provider without approval.
+6. The new 3D atlas is static and only visualizes data produced by existing analysis services.
+7. Never change analysis services merely to simplify the 3D model.

@@ -1,5 +1,5 @@
-import AppShell from "@/components/AppShell";
+import LoadingAuthScreen from "@/components/onboarding/LoadingAuthScreen";
 
 export default function Home() {
-  return <AppShell />;
+  return <LoadingAuthScreen />;
 }

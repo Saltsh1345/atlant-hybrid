@@ -1,0 +1,18 @@
+---
+description: Safe selection of AI agents and tools per stage
+alwaysApply: true
+---
+
+# AI Routing
+
+Read `docs/AI_ROUTING.md` before delegating work.
+
+1. Keep one primary agent responsible for scope and final verification.
+2. Use Explore only for codebase research.
+3. Use Browser-use only for browser UI, camera, OAuth, gestures, and responsive verification.
+4. Use Security Review or Bugbot only when the user explicitly requests it.
+5. Give every subagent a narrow stage-scoped task and the current forbidden paths.
+6. Recheck subagent output against the passport before applying it.
+7. Do not switch the application's Gemini provider.
+8. Do not claim that repository rules can force the Cursor UI to select a particular model.
+9. Do not start another stage through a subagent.

@@ -1,0 +1,84 @@
+---
+description: Paths protected after stage acceptance
+alwaysApply: true
+---
+
+# Frozen Stage Registry
+
+Files listed here are read-only unless the user explicitly authorizes reopening their stage.
+
+## Currently frozen
+
+### Этап 0 — accepted 2026-07-19
+
+Read-only files:
+
+- `docs/MASTER_TZ.md`
+- `docs/AI_ROUTING.md`
+- `docs/passports/stage-00-governance.md`
+- `docs/google-docs/SETUP.md`
+- `docs/google-docs/Code.gs`
+- `.cursor/rules/00-master-process.mdc`
+- `.cursor/rules/20-approved-stack.mdc`
+- `.cursor/rules/30-stage-passports.mdc`
+- `.cursor/rules/40-ai-routing.mdc`
+- `tools/google-docs/sync-passport.mjs`
+
+Protected entries:
+
+- `package.json` → `scripts.passport:sync`
+- `.env.local.example` → `GOOGLE_DOCS_PASSPORT_*`
+
+### Этап 1 — accepted 2026-07-19
+
+Read-only files:
+
+- `src/app/page.tsx`
+- `src/app/auth/callback/route.ts`
+- `src/components/onboarding/LoadingAuthScreen.tsx`
+- `src/lib/supabase/config.ts`
+- `src/lib/supabase/browser.ts`
+- `src/lib/supabase/server.ts`
+- `src/lib/supabase/proxy.ts`
+- `src/store/userHealthStore.ts`
+- `src/proxy.ts`
+- `supabase/migrations/202607190001_stage_01_profiles.sql`
+- `docs/passports/stage-01-auth-loading.md`
+
+Protected entries:
+
+- `package.json` → dependencies `@supabase/ssr`, `@supabase/supabase-js`
+- `package-lock.json` → installed Supabase dependency records
+- `.env.local.example` → `NEXT_PUBLIC_SUPABASE_*`, `HUAWEI_*`
+
+Process-controlled files remain writable only for stage bookkeeping:
+
+- `docs/PROGRESS.md`
+- `docs/passports/README.md`
+- `.cursor/rules/10-frozen-stages.mdc`
+
+### Этап 2 — accepted 2026-07-20
+
+Read-only files:
+
+- `src/app/scan/page.tsx`
+- `src/components/scan/ScanFlow.tsx`
+- `src/lib/scan/stablePoseGate.ts`
+- `src/lib/scan/postureMetrics.ts`
+- `src/lib/scan/scanResult.ts`
+- `src/lib/scan/persistScan.ts`
+- `src/store/scanStore.ts`
+- `supabase/migrations/202607190002_stage_02_body_scans.sql`
+- `docs/passports/stage-02-scan.md`
+
+## Freeze procedure
+
+After explicit user acceptance:
+
+1. Add the accepted stage, date, and exact paths below.
+2. Set its status to `ЗАВЕРШЁН — ЗАМОРОЖЕН` in `docs/PROGRESS.md`.
+3. Update the stage passport.
+4. Sync the passport to Google Docs.
+5. Create a Git commit only when explicitly requested.
+
+Do not infer permission to edit a frozen file from a later broad request. Ask the user to reopen the specific stage or file.

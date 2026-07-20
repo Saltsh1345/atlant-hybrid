@@ -1,0 +1,30 @@
+---
+description: Mandatory stage passport and Google Docs synchronization process
+alwaysApply: true
+---
+
+# Stage Passports
+
+Every stage must have one file in `docs/passports/`.
+
+Before work:
+
+- Record goal, scope, allowed paths, forbidden changes, and starting state.
+
+After work:
+
+- Record every created, modified, renamed, or deleted file.
+- Record verification commands and results.
+- Record limitations, manual actions, and user decisions.
+- Set status to `ОЖИДАЕТ ПРИЁМКИ`.
+- Stop and wait for explicit acceptance.
+
+After acceptance:
+
+- Set status to `ЗАВЕРШЁН — ЗАМОРОЖЕН`.
+- Update `.cursor/rules/10-frozen-stages.mdc`.
+- Sync the passport to the dedicated Google Docs folder.
+- Record the Google Doc URL.
+- Commit only if explicitly requested.
+
+If Google synchronization is unavailable, keep the local passport authoritative, mark sync as blocked, and tell the user exactly which manual setup step is missing. Never skip the passport.

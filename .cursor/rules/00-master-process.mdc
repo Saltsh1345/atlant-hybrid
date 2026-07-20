@@ -1,0 +1,21 @@
+---
+description: Mandatory staged workflow and change-control rules for Atlant-Hybrid
+alwaysApply: true
+---
+
+# Mandatory Project Process
+
+1. Read `docs/MASTER_TZ.md`, `docs/PROGRESS.md`, and the current stage passport before acting.
+2. Work only on the stage whose status is `В РАБОТЕ`.
+3. Make only changes explicitly requested by the user.
+4. Never delete, replace, simplify, refactor, or rename working code unless the user explicitly requests that exact change.
+5. Never alter a completed or frozen stage without separate user approval.
+6. If a required change touches another stage, stop and ask first.
+7. Improvements must be proposed in chat before implementation.
+8. Do not change providers, architecture, dependencies, routes, or data contracts without approval.
+9. After implementation, verify the current stage, update its passport, set it to `ОЖИДАЕТ ПРИЁМКИ`, and stop.
+10. Start the next stage only after the user explicitly accepts and authorizes it.
+11. Never commit or push unless the user explicitly requests it.
+12. Preserve existing user changes and untracked files.
+
+When instructions conflict, the latest direct user instruction wins. Record the decision in the current stage passport.
