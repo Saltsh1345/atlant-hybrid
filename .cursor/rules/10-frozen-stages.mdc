@@ -71,6 +71,21 @@ Read-only files:
 - `supabase/migrations/202607190002_stage_02_body_scans.sql`
 - `docs/passports/stage-02-scan.md`
 
+### Технический подэтап 3D-атласа — accepted 2026-07-20
+
+Read-only files:
+
+- `src/types/atlas.ts`
+- `src/lib/three/atlasDefaults.ts`
+- `src/lib/three/atlasMuscleMap.ts`
+- `src/lib/three/atlasZoneMaterial.ts`
+- `src/components/atlas/AtlasModel.tsx`
+- `src/components/atlas/AtlasScene.tsx`
+- `src/components/atlas/AtlasViewer.tsx`
+- `docs/passports/stage-03-static-3d-atlas.md`
+
+Note: `AtlasViewer` is consumed read-only by later stages via props.
+
 ## Freeze procedure
 
 After explicit user acceptance:
