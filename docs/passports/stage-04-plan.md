@@ -103,6 +103,6 @@
 ## Приёмка
 
 - Решение пользователя: `ПРИНЯТ 2026-07-20`
-- Git commit: `НЕ СОЗДАН`
+- Git commit: `24f30af` (Этап 3), `f486ed9` (точечный переход `/plan → /workout`)
 - Заморозка: `ДА`
 - Google Docs: https://docs.google.com/open?id=1gJHbpagDo_ePsf5rrAcz7hAQQ6GCRt8KvIFY_hI_9ic
