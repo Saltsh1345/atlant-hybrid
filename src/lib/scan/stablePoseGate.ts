@@ -5,13 +5,31 @@ export interface StablePoseState {
   complete: boolean;
 }
 
+/**
+ * Устойчивый гейт захвата: короткие провалы кадров не сбрасывают прогресс сразу.
+ * Нужно `requiredSamples` удачных оценок подряд с допуском `missTolerance` промахов.
+ */
 export class StablePoseGate {
   private acceptedSamples = 0;
+  private missStreak = 0;
 
-  constructor(private readonly requiredSamples = 12) {}
+  constructor(
+    private readonly requiredSamples = 18,
+    private readonly missTolerance = 3,
+  ) {}
 
   update(accepted: boolean): StablePoseState {
-    this.acceptedSamples = accepted ? this.acceptedSamples + 1 : 0;
+    if (accepted) {
+      this.acceptedSamples += 1;
+      this.missStreak = 0;
+    } else {
+      this.missStreak += 1;
+      if (this.missStreak > this.missTolerance) {
+        this.acceptedSamples = 0;
+        this.missStreak = 0;
+      }
+    }
+
     const complete = this.acceptedSamples >= this.requiredSamples;
 
     return {
@@ -24,5 +42,6 @@ export class StablePoseGate {
 
   reset() {
     this.acceptedSamples = 0;
+    this.missStreak = 0;
   }
 }

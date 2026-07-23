@@ -5,11 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { NormalizedLandmark } from "@/types";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import PoseOverlay from "@/components/camera/PoseOverlay";
-import SilhouetteGuide from "@/components/camera/SilhouetteGuide";
+import ScanSilhouetteGuide from "@/components/scan/ScanSilhouetteGuide";
 import { useCameraDevice } from "@/hooks/useCameraDevice";
 import { usePoseTracker } from "@/hooks/usePoseTracker";
 import { analyzePoseLive } from "@/lib/calibration/poseAnalysis";
 import { fullBodyProgress } from "@/lib/calibration/scanAnalysis";
+import { LandmarkSmoother } from "@/lib/scan/landmarkSmoother";
 import { buildStageTwoScanResult } from "@/lib/scan/scanResult";
 import {
   loadStatureFromProfile,
@@ -55,7 +56,8 @@ export default function ScanFlow() {
   const landmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const frontLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const sideLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
-  const gateRef = useRef(new StablePoseGate(12));
+  const gateRef = useRef(new StablePoseGate(18, 3));
+  const smootherRef = useRef(new LandmarkSmoother(0.38));
   const capturePendingRef = useRef(false);
   const [heightInput, setHeightInput] = useState("");
   const [checkingSavedHeight, setCheckingSavedHeight] = useState(true);
@@ -161,6 +163,7 @@ export default function ScanFlow() {
       if (phase === "front") {
         frontLandmarksRef.current = snapshot;
         gateRef.current.reset();
+        smootherRef.current.reset();
         setGuide(EMPTY_GUIDE);
         setPhase("side");
         speak("Фронтальный вид сохранен. Повернитесь боком.");
@@ -183,14 +186,16 @@ export default function ScanFlow() {
     let animationFrame = 0;
     let active = true;
     let lastEvaluationAt = 0;
+    smootherRef.current.reset();
 
     const loop = (timestamp: number) => {
       if (!active) return;
 
-      const landmarks = tick();
+      const raw = tick();
+      const landmarks = smootherRef.current.update(raw);
       landmarksRef.current = landmarks;
 
-      if (timestamp - lastEvaluationAt >= 120) {
+      if (timestamp - lastEvaluationAt >= 50) {
         lastEvaluationAt = timestamp;
         const calibrationStep = phase === "front" ? "center" : "profile_turn";
         const live = analyzePoseLive(calibrationStep, landmarks);
@@ -255,6 +260,7 @@ export default function ScanFlow() {
       frontLandmarksRef.current = null;
       sideLandmarksRef.current = null;
       gateRef.current.reset();
+      smootherRef.current.reset();
       setGuide(EMPTY_GUIDE);
       setPhase("front");
     } catch {
@@ -270,6 +276,7 @@ export default function ScanFlow() {
     sideLandmarksRef.current = null;
     landmarksRef.current = null;
     gateRef.current.reset();
+    smootherRef.current.reset();
     capturePendingRef.current = false;
     setGuide(EMPTY_GUIDE);
     setHeightInput(statureCm?.toString() ?? "");
@@ -454,10 +461,11 @@ export default function ScanFlow() {
         landmarksRef={landmarksRef}
         mirrored
         mode="calibration"
+        redrawMs={48}
       />
-      <SilhouetteGuide
-        sport="strength"
-        progress={guide.progress}
+      <ScanSilhouetteGuide
+        view={phase === "side" ? "side" : "front"}
+        progress={guide.holdProgress || guide.progress}
         fit={guide.accepted}
         visible={phase === "front" || phase === "side"}
       />

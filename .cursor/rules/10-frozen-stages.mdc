@@ -62,8 +62,10 @@ Process-controlled files remain writable only for stage bookkeeping:
 Read-only files:
 
 - `src/app/scan/page.tsx`
-- `src/components/scan/ScanFlow.tsx`
-- `src/lib/scan/stablePoseGate.ts`
+- `src/components/scan/ScanFlow.tsx` (точечно переоткрыт 2026-07-23: силуэт + сглаживание захвата)
+- `src/lib/scan/stablePoseGate.ts` (точечно переоткрыт 2026-07-23)
+- `src/components/scan/ScanSilhouetteGuide.tsx`
+- `src/lib/scan/landmarkSmoother.ts`
 - `src/lib/scan/postureMetrics.ts`
 - `src/lib/scan/scanResult.ts`
 - `src/lib/scan/persistScan.ts`

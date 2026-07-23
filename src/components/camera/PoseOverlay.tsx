@@ -10,7 +10,7 @@ import { POSE_CONNECTIONS } from "@/lib/pose/landmarks";
 import type { NormalizedLandmark } from "@/types";
 
 /** Overlay redraw cadence when driven by landmarksRef (no parent setState). */
-const REF_DRAW_MS = 200;
+const DEFAULT_REF_DRAW_MS = 200;
 
 function tensionColor(tension: number): string {
   if (tension < 0.35) return "#22c55e";
@@ -25,6 +25,7 @@ export default function PoseOverlay({
   tension = 0,
   mode = "training",
   motionDir = "",
+  redrawMs = DEFAULT_REF_DRAW_MS,
 }: {
   landmarks?: NormalizedLandmark[] | null;
   /** Prefer this on live screens — avoids putting landmark arrays in parent React state. */
@@ -33,6 +34,8 @@ export default function PoseOverlay({
   tension?: number;
   mode?: "training" | "calibration";
   motionDir?: string;
+  /** Cadence for ref-driven redraw (ms). Lower = smoother skeleton. */
+  redrawMs?: number;
 }) {
   const color = mode === "calibration" ? "#4ade80" : tensionColor(tension);
   const prevRef = useRef<{ x: number; y: number } | null>(null);
@@ -56,7 +59,7 @@ export default function PoseOverlay({
       const now = performance.now();
       const present = !!lm;
       const presenceChanged = present !== hadLmRef.current;
-      const due = now - lastDrawAtRef.current >= REF_DRAW_MS;
+      const due = now - lastDrawAtRef.current >= redrawMs;
 
       if (presenceChanged || (present && due)) {
         hadLmRef.current = present;
@@ -71,7 +74,7 @@ export default function PoseOverlay({
       alive = false;
       cancelAnimationFrame(raf);
     };
-  }, [landmarksRef]);
+  }, [landmarksRef, redrawMs]);
 
   const landmarks = landmarksRef ? refLandmarks : landmarksProp;
 
