@@ -86,6 +86,45 @@ Read-only files:
 
 Note: `AtlasViewer` is consumed read-only by later stages via props.
 
+### Этап 3 — accepted 2026-07-20
+
+Read-only files:
+
+- `src/app/plan/page.tsx`
+- `src/app/api/plan/generate/route.ts`
+- `src/components/plan/PlanAtlasPanel.tsx`
+- `src/components/plan/PlanCalendar.tsx`
+- `src/components/plan/PlanDashboard.tsx`
+- `src/components/plan/StartWorkoutButton.tsx` (точечно переоткрыт 2026-07-23 для перехода `/plan → /workout`; снова read-only)
+- `src/components/plan/TodayExerciseCards.tsx`
+- `src/lib/plan/types.ts`
+- `src/lib/plan/readinessToAtlas.ts`
+- `src/lib/plan/planContext.ts`
+- `src/lib/plan/generatePlanWithGemini.ts`
+- `src/lib/plan/persistPlan.ts`
+- `src/store/planStore.ts`
+- `supabase/migrations/202607200003_stage_03_workout_plans.sql`
+- `docs/passports/stage-04-plan.md`
+
+### Этап 4 — accepted 2026-07-20
+
+Read-only files:
+
+- `src/app/workout/page.tsx`
+- `src/components/workout/WorkoutLiveScreen.tsx`
+- `src/components/workout/WorkoutPoseOverlay.tsx`
+- `src/components/workout/WorkoutHUD.tsx`
+- `src/components/workout/WorkoutAtlasPanel.tsx`
+- `src/lib/workout/types.ts`
+- `src/lib/workout/vbtFatigue.ts`
+- `src/lib/workout/gestureDetector.ts`
+- `src/lib/workout/gestureStateMachine.ts`
+- `src/lib/workout/loadWorkoutProfile.ts`
+- `src/lib/workout/persistWorkoutSession.ts`
+- `src/lib/workout/buildWorkoutAtlasZones.ts`
+- `src/store/workoutStore.ts`
+- `docs/passports/stage-05-workout.md`
+
 ## Freeze procedure
 
 After explicit user acceptance:

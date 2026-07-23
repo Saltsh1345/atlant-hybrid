@@ -2,7 +2,7 @@
 
 ## Статус
 
-`В РАБОТЕ`
+`ЗАВЕРШЁН — ЗАМОРОЖЕН`
 
 ## Цель
 
@@ -38,6 +38,16 @@
 - Gemini уже интегрирован в проект (body-scan анализ); планировщика нет.
 - Маршрута `/plan` нет.
 
+## Результат read-only аудита
+
+- Gemini-клиент создаётся по паттерну `src/lib/ai/gemini.ts`: `GEMINI_API_KEY`, перебор `GEMINI_MODELS`, локальный fallback. Для плана создаётся новый `src/lib/plan/generatePlanWithGemini.ts` и новый route `src/app/api/plan/generate/route.ts`; существующие Gemini-файлы не изменяются.
+- Локальный `generateWorkoutPlan` из `src/lib/ai/workoutPlan.ts` используется как offline-fallback планировщика.
+- Готового календаря в проекте нет; референсы карточек — `TrainingProgramPanel` и `AiPlanCard`. Для `/plan` создаются новые компоненты.
+- `computeMuscleReadiness` даёт группы «Ноги/Спина/Грудь/Плечи/Кор»; для подсветки атласа нужен адаптер групп к `ATLAS_MUSCLE_GROUPS`.
+- История тренировок сейчас только в Zustand; по ТЗ создаются таблицы Supabase `workout_sessions` и `workout_plans` с RLS по паттерну Этапов 1–2.
+- Контекст Gemini читается из `profiles` (`hyperlordosis_likely`, `scan_anthropometrics`, health-поля) и последнего `body_scans.result`.
+- `AtlasViewer` замороженный: подсветка через `mode: "plan"`, статусы `not_recovered` и `target` (синий пульс задаётся пресетом).
+
 ## План внутри этапа
 
 1. Провести read-only аудит существующих Gemini-модулей, dashboard-компонентов и данных, доступных для контекста плана.
@@ -51,23 +61,48 @@
 
 ## Изменённые файлы
 
-Пока отсутствуют.
+Созданы (существующие файлы не изменялись):
+
+- `supabase/migrations/202607200003_stage_03_workout_plans.sql` — таблицы `workout_sessions` (история тренировок) и `workout_plans` (план дня, upsert по `user_id + plan_date`) с RLS по паттерну Этапов 1–2.
+- `src/lib/plan/types.ts` — контракты этапа: `DailyPlan`, `PlanExercise`, `PlanSessionRow`, `PlanGenerationContext`.
+- `src/lib/plan/readinessToAtlas.ts` — восстановление групп по истории Supabase (`computePlanRecovery`, без latchedBody), порог 55 %, адаптер `buildPlanAtlasZones` → зоны `not_recovered`/`target` для замороженного `AtlasViewer`.
+- `src/lib/plan/planContext.ts` — чтение контекста: профиль (рост, вес, возраст, жир, `hyperlordosis_likely`, `scan_anthropometrics`), осанка из последнего `body_scans.result`, последние 10 тренировок.
+- `src/lib/plan/generatePlanWithGemini.ts` — серверная генерация плана: перебор `GEMINI_MODELS`, ответ строго JSON, валидация `exerciseId` по каталогу, защита от гиперлордоза (замена осевых упражнений: squat→leg_press, deadlift→hip_thrust и т.д.), fallback на локальный `generateWorkoutPlan`.
+- `src/lib/plan/persistPlan.ts` — сохранение плана (upsert) и чтение планов/сессий за диапазон дат.
+- `src/app/api/plan/generate/route.ts` — новый route handler POST с проверкой сессии Supabase (401 без входа), `maxDuration 60`.
+- `src/store/planStore.ts` — Zustand-состояние этапа: выбранная дата, планы по датам, сессии, контекст, статусы загрузки/генерации.
+- `src/components/plan/PlanCalendar.tsx` — интерактивный месячный календарь (Пн–Вс, навигация по месяцам, метки: зелёная — выполненная тренировка, голубая — план).
+- `src/components/plan/TodayExerciseCards.tsx` — карточки упражнений дня (подходы×повторы, отдых, инвентарь, подсказка), советы плана, кнопка генерации/обновления.
+- `src/components/plan/PlanAtlasPanel.tsx` — замороженный `AtlasViewer` в `mode: "plan"` + легенда + проценты восстановления пяти групп.
+- `src/components/plan/StartWorkoutButton.tsx` — точечное переоткрытие 2026-07-23: заглушка заменена на активную ссылку `[ START WORKOUT ]` → `/workout` при наличии плана дня; без плана кнопка остаётся неактивной. Других изменений в файлах Этапа 3 нет.
+- `src/components/plan/PlanDashboard.tsx` — оркестрация: загрузка контекста, экран «Нужен вход» без сессии, обновление данных при смене месяца, генерация и сохранение плана.
+- `src/app/plan/page.tsx` — страница маршрута `/plan`.
+
+Замороженные файлы не изменялись. Существующие Gemini-модули использованы только импортом (`GEMINI_MODELS`, `isModelNotFoundError`, `generateWorkoutPlan`).
 
 ## Проверки
 
-Пока отсутствуют.
+- `npm run lint` — exit 0, новых предупреждений по файлам этапа нет.
+- `npx tsc --noEmit` — ошибок в файлах Этапа 3 нет; остаются 4 ранее известные ошибки в старом 3D-коде (`src/components/Avatar3D/Model.tsx`, `src/components/three/AvatarViewerInner.tsx`) — заморожены, вне зоны этапа.
+- `npx eslint src/components/plan/StartWorkoutButton.tsx` — exit 0 после точечного переоткрытия 2026-07-23 (переход `/plan → /workout`).
+- `GET /plan` — HTTP 200 на dev-сервере.
+- Браузер: без сессии `/plan` показывает экран «Нужен вход» с кнопкой «НА ГЛАВНУЮ» — подтверждено скриншотом-снапшотом.
+- `POST /api/plan/generate` без сессии — HTTP 401 (авторизация обязательна).
 
 ## Ограничения
 
 - План Gemini — рекомендация, не медицинское назначение.
-- Кнопка `[ START WORKOUT ]` ведёт на `/workout` только после создания этого маршрута в Этапе 4; до этого — заглушка.
+- Кнопка `[ START WORKOUT ]` ведёт на готовый маршрут `/workout` (Этап 4) при наличии плана на выбранный день; без плана — неактивна.
 
 ## Ручные действия владельца
 
-Будут уточнены: потребуется применить новую SQL-миграцию в Supabase и проверить `GEMINI_API_KEY`.
+1. В Supabase Dashboard откройте **SQL Editor** и примените `supabase/migrations/202607200003_stage_03_workout_plans.sql`. Без неё сохранение планов вернёт ошибку, а календарь не покажет историю.
+2. Убедитесь, что в `.env.local` задан `GEMINI_API_KEY`. Без ключа планировщик работает на локальном fallback (это штатный режим, план всё равно создаётся).
+3. В обычном Chrome/Edge войдите через Google на `http://localhost:3000`, откройте `http://localhost:3000/plan`, нажмите «СГЕНЕРИРОВАТЬ ПЛАН» и проверьте: карточки упражнений, подсветку атласа (синий пульс — цель дня, тускло-красный — невосстановлено) и появление голубой метки в календаре.
 
 ## Приёмка
 
-- Решение пользователя: `ОЖИДАЕТСЯ`
+- Решение пользователя: `ПРИНЯТ 2026-07-20`
 - Git commit: `НЕ СОЗДАН`
-- Заморозка: `НЕТ`
+- Заморозка: `ДА`
+- Google Docs: https://docs.google.com/open?id=1gJHbpagDo_ePsf5rrAcz7hAQQ6GCRt8KvIFY_hI_9ic
