@@ -16,8 +16,8 @@ export interface GestureStateMachine {
  * the long hold prevents an accidental stop while preserving touchless use.
  */
 export function createGestureStateMachine(
-  holdFrames = 10,
-  cooldownMs = 1600,
+  holdFrames = 6,
+  cooldownMs = 1200,
 ): GestureStateMachine {
   let candidate: WorkoutGesture | null = null;
   let frames = 0;

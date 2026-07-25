@@ -69,6 +69,8 @@
 - `src/lib/scan/persistScan.ts` — точечное переоткрытие 2026-07-20: добавлено чтение сохранённого `profiles.height_cm` для повторной верификации.
 - `src/components/scan/ScanFlow.tsx` — точечное переоткрытие 2026-07-20: ввод роста только при отсутствии валидного `height_cm` в профиле.
 - `src/components/scan/ScanFlow.tsx` — точечное переоткрытие 2026-07-23: новый `ScanSilhouetteGuide` (front/side), EMA-сглаживание landmarks, оценка каждые 50 ms, скелет overlay 48 ms.
+- `src/components/scan/ScanFlow.tsx` — точечное переоткрытие 2026-07-25: исправлен infinite loop `Maximum update depth exceeded` (refs для tick/capture, `setGuide` только при изменении значений).
+- `src/components/scan/ScanFlow.tsx` — точечное переоткрытие 2026-07-25: активная ссылка «К ПЛАНУ ТРЕНИРОВОК» → `/plan` на экране результата (вместо заглушки «СКОРО»).
 - `src/lib/scan/stablePoseGate.ts` — точечное переоткрытие 2026-07-23: допуск коротких провалов кадров, 18 сэмплов для захвата.
 - `src/components/scan/ScanSilhouetteGuide.tsx` — голографический sci-fi HUD: wireframe, targeting brackets, sweep beam, телеметрия (перерисовка 2026-07-23).
 - `src/lib/scan/landmarkSmoother.ts` — экспоненциальное сглаживание MediaPipe для стабильного захвата.

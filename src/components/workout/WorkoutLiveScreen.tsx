@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import { useCameraDevice } from "@/hooks/useCameraDevice";
@@ -7,7 +8,7 @@ import { usePoseTracker } from "@/hooks/usePoseTracker";
 import { angle, LM } from "@/lib/pose/landmarks";
 import { exerciseById } from "@/lib/training/exerciseCatalog";
 import { createGestureStateMachine } from "@/lib/workout/gestureStateMachine";
-import { detectWorkoutGesture } from "@/lib/workout/gestureDetector";
+import { detectWorkoutGesture, warmHandLandmarker } from "@/lib/workout/gestureDetector";
 import { loadWorkoutProfile, type WorkoutProfile } from "@/lib/workout/loadWorkoutProfile";
 import { persistWorkoutSession } from "@/lib/workout/persistWorkoutSession";
 import { createVerticalVbtTracker } from "@/lib/workout/vbtFatigue";
@@ -51,6 +52,8 @@ export default function WorkoutLiveScreen() {
   const [savingSession, setSavingSession] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const savedRef = useRef(false);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
 
   const phase = useWorkoutStore((state) => state.phase);
   const elapsedSec = useWorkoutStore((state) => state.elapsedSec);
@@ -94,6 +97,7 @@ export default function WorkoutLiveScreen() {
     const vbt = vbtRef.current;
     const gestureState = gestureStateRef.current;
     void loadWorkoutProfile().then(setProfile);
+    void warmHandLandmarker();
     return () => {
       vbt.reset();
       gestureState.reset();
@@ -140,10 +144,13 @@ export default function WorkoutLiveScreen() {
                   ? "ДЛИННОЕ УДЕРЖАНИЕ ЛАДОНИ · ЗАВЕРШЕНИЕ"
                   : "ОТКРЫТАЯ ЛАДОНЬ · ПАУЗА",
             );
-            if (stableGesture === "thumbs_up" && phase !== "running") {
-              start(performance.now());
+            if (stableGesture === "thumbs_up") {
+              const currentPhase = phaseRef.current;
+              if (currentPhase !== "running") {
+                start(performance.now());
+              }
             }
-            if (stableGesture === "open_palm" && phase === "running") {
+            if (stableGesture === "open_palm" && phaseRef.current === "running") {
               pause();
             }
             if (stableGesture === "open_palm_hold") {
@@ -172,16 +179,51 @@ export default function WorkoutLiveScreen() {
       <CameraStatusOverlay cameraStatus={cameraStatus} cameraError={cameraError} poseReady={poseReady} poseError={poseError} />
       <WorkoutHUD phase={phase} elapsedSec={elapsedSec} metrics={metrics} weightKg={profile?.weightKg ?? null} lastGesture={lastGesture} />
       <WorkoutAtlasPanel targetMeshes={targetMeshes} fatiguePercent={metrics.fatiguePercent} failed={metrics.failed} />
-      <div className="absolute inset-x-0 bottom-5 z-20 flex flex-col items-center gap-2 px-4 text-center">
-        {phase !== "ready" && phase !== "finished" && (
+      <div className="absolute inset-x-0 bottom-5 z-30 flex flex-col items-center gap-2 px-4 text-center">
+        {phase === "ready" && (
+          <button
+            type="button"
+            onClick={() => start(performance.now())}
+            className="w-full max-w-sm rounded-2xl border border-cyan-200/50 bg-cyan-300 px-5 py-3 text-sm font-bold tracking-[0.08em] text-black shadow-[0_0_35px_rgba(34,211,238,0.28)]"
+          >
+            НАЧАТЬ ТРЕНИРОВКУ
+          </button>
+        )}
+        {phase === "paused" && (
+          <button
+            type="button"
+            onClick={() => start(performance.now())}
+            className="w-full max-w-sm rounded-2xl border border-cyan-200/50 bg-cyan-300/90 px-5 py-3 text-sm font-bold tracking-[0.08em] text-black"
+          >
+            ПРОДОЛЖИТЬ
+          </button>
+        )}
+        {phase === "running" && (
+          <button
+            type="button"
+            onClick={() => pause()}
+            className="w-full max-w-sm rounded-2xl border border-white/20 bg-black/70 px-5 py-3 text-sm font-semibold tracking-wider text-zinc-100"
+          >
+            ПАУЗА
+          </button>
+        )}
+        {(phase === "running" || phase === "paused") && (
           <button
             type="button"
             onClick={() => void finishSession()}
             disabled={savingSession}
-            className="pointer-events-auto rounded-xl border border-rose-300/50 bg-black/70 px-4 py-2 text-xs font-semibold tracking-wider text-rose-100 disabled:opacity-50"
+            className="w-full max-w-sm rounded-2xl border border-rose-300/50 bg-rose-500/20 px-5 py-3 text-sm font-bold tracking-wider text-rose-100 disabled:opacity-50"
           >
             {savingSession ? "СОХРАНЕНИЕ..." : "ЗАВЕРШИТЬ И СОХРАНИТЬ"}
           </button>
+        )}
+        {phase === "finished" && (
+          <Link
+            href="/analytics"
+            className="w-full max-w-sm rounded-2xl border border-cyan-200/50 bg-cyan-300 px-5 py-3 text-sm font-bold tracking-[0.08em] text-black"
+          >
+            К АНАЛИТИКЕ
+          </Link>
         )}
         {saveMessage && (
           <p className={saveMessage === "Тренировка сохранена" ? "text-xs text-emerald-300" : "text-xs text-rose-300"}>
@@ -189,7 +231,8 @@ export default function WorkoutLiveScreen() {
           </p>
         )}
         <p className="text-[0.6rem] text-zinc-400">
-          Открытая ладонь — пауза. Удерживайте её 1,8 с, чтобы завершить и сохранить. VBT — оценка по камере.
+          Жесты: 👍 старт/продолжить · ✋ пауза · удержание ✋ 1,8 с — завершить.
+          Кнопки внизу — запасной способ.
         </p>
       </div>
     </main>

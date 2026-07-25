@@ -6,6 +6,7 @@ import AnalyticsAtlasPanel from "@/components/analytics/AnalyticsAtlasPanel";
 import AnalyticsCharts from "@/components/analytics/AnalyticsCharts";
 import AnalyticsSummaryCard from "@/components/analytics/AnalyticsSummaryCard";
 import AnalyticsZoneTooltip from "@/components/analytics/AnalyticsZoneTooltip";
+import { authFetch } from "@/lib/supabase/authFetch";
 import {
   buildLocalReportDraft,
   loadAnalyticsDashboard,
@@ -51,7 +52,7 @@ export default function AnalyticsDashboard() {
     setSummarizing(true);
     setActionError(null);
     try {
-      const response = await fetch("/api/analytics/summary", {
+      const response = await authFetch("/api/analytics/summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: session.id }),

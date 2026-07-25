@@ -59,6 +59,7 @@ export default function ScanFlow() {
   const gateRef = useRef(new StablePoseGate(18, 3));
   const smootherRef = useRef(new LandmarkSmoother(0.38));
   const capturePendingRef = useRef(false);
+  const guideRef = useRef<LiveGuide>(EMPTY_GUIDE);
   const [heightInput, setHeightInput] = useState("");
   const [checkingSavedHeight, setCheckingSavedHeight] = useState(true);
   const [guide, setGuide] = useState<LiveGuide>(EMPTY_GUIDE);
@@ -153,6 +154,11 @@ export default function ScanFlow() {
     [setError, setPhase, setResult, setSaving, statureCm],
   );
 
+  const applyGuide = useCallback((next: LiveGuide) => {
+    guideRef.current = next;
+    setGuide(next);
+  }, []);
+
   const captureStablePose = useCallback(
     async (landmarks: NormalizedLandmark[]) => {
       if (capturePendingRef.current) return;
@@ -164,7 +170,7 @@ export default function ScanFlow() {
         frontLandmarksRef.current = snapshot;
         gateRef.current.reset();
         smootherRef.current.reset();
-        setGuide(EMPTY_GUIDE);
+        applyGuide(EMPTY_GUIDE);
         setPhase("side");
         speak("Фронтальный вид сохранен. Повернитесь боком.");
         return;
@@ -177,8 +183,15 @@ export default function ScanFlow() {
 
       capturePendingRef.current = false;
     },
-    [finishScan, phase, setPhase],
+    [finishScan, phase, applyGuide, setPhase],
   );
+
+  const tickRef = useRef(tick);
+  const captureStablePoseRef = useRef(captureStablePose);
+  const phaseRef = useRef(phase);
+  tickRef.current = tick;
+  captureStablePoseRef.current = captureStablePose;
+  phaseRef.current = phase;
 
   useEffect(() => {
     if (phase !== "front" && phase !== "side") return;
@@ -186,24 +199,25 @@ export default function ScanFlow() {
     let animationFrame = 0;
     let active = true;
     let lastEvaluationAt = 0;
-    smootherRef.current.reset();
 
     const loop = (timestamp: number) => {
       if (!active) return;
 
-      const raw = tick();
+      const raw = tickRef.current();
       const landmarks = smootherRef.current.update(raw);
       landmarksRef.current = landmarks;
 
       if (timestamp - lastEvaluationAt >= 50) {
         lastEvaluationAt = timestamp;
-        const calibrationStep = phase === "front" ? "center" : "profile_turn";
+        const currentPhase = phaseRef.current;
+        const calibrationStep =
+          currentPhase === "front" ? "center" : "profile_turn";
         const live = analyzePoseLive(calibrationStep, landmarks);
         const fullBody = fullBodyProgress(landmarks);
         const accepted = live.accepted && fullBody.ok;
         const hold = gateRef.current.update(accepted);
 
-        setGuide({
+        const nextGuide: LiveGuide = {
           progress: Math.min(live.progress, fullBody.score),
           accepted,
           feedback: accepted
@@ -212,10 +226,20 @@ export default function ScanFlow() {
               ? fullBody.reason
               : live.feedback,
           holdProgress: hold.progress,
-        });
+        };
+
+        const prev = guideRef.current;
+        if (
+          prev.progress !== nextGuide.progress ||
+          prev.accepted !== nextGuide.accepted ||
+          prev.feedback !== nextGuide.feedback ||
+          prev.holdProgress !== nextGuide.holdProgress
+        ) {
+          applyGuide(nextGuide);
+        }
 
         if (hold.complete && landmarks) {
-          void captureStablePose(landmarks);
+          void captureStablePoseRef.current(landmarks);
         }
       }
 
@@ -228,7 +252,7 @@ export default function ScanFlow() {
       active = false;
       window.cancelAnimationFrame(animationFrame);
     };
-  }, [captureStablePose, phase, tick]);
+  }, [applyGuide, phase]);
 
   useEffect(() => {
     if (phase === "front") {
@@ -261,7 +285,7 @@ export default function ScanFlow() {
       sideLandmarksRef.current = null;
       gateRef.current.reset();
       smootherRef.current.reset();
-      setGuide(EMPTY_GUIDE);
+      applyGuide(EMPTY_GUIDE);
       setPhase("front");
     } catch {
       setError("Не удалось сохранить рост. Сначала войдите через Google.");
@@ -278,7 +302,7 @@ export default function ScanFlow() {
     gateRef.current.reset();
     smootherRef.current.reset();
     capturePendingRef.current = false;
-    setGuide(EMPTY_GUIDE);
+    applyGuide(EMPTY_GUIDE);
     setHeightInput(statureCm?.toString() ?? "");
     reset();
     if (statureCm) {
@@ -417,14 +441,12 @@ export default function ScanFlow() {
           >
             ПОВТОРИТЬ СКАНИРОВАНИЕ
           </button>
-          <button
-            type="button"
-            disabled
-            className="mt-3 w-full cursor-not-allowed rounded-2xl border border-white/10 px-5 py-4 text-sm font-semibold text-zinc-600"
-            title="Раздел будет доступен после Этапа 3"
+          <Link
+            href="/plan"
+            className="mt-3 block w-full rounded-2xl border border-cyan-200/50 bg-cyan-300 px-5 py-4 text-center text-sm font-bold tracking-[0.08em] text-black shadow-[0_0_35px_rgba(34,211,238,0.28)] transition hover:bg-cyan-200"
           >
-            К ПЛАНУ · СКОРО
-          </button>
+            К ПЛАНУ ТРЕНИРОВОК
+          </Link>
         </div>
       </main>
     );

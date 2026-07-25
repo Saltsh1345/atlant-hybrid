@@ -14,6 +14,7 @@ import PlanCalendar from "@/components/plan/PlanCalendar";
 import TodayExerciseCards from "@/components/plan/TodayExerciseCards";
 import PlanAtlasPanel from "@/components/plan/PlanAtlasPanel";
 import StartWorkoutButton from "@/components/plan/StartWorkoutButton";
+import { authFetch } from "@/lib/supabase/authFetch";
 
 function monthRange(monthDate: Date): { from: string; to: string } {
   const from = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -103,7 +104,7 @@ export default function PlanDashboard() {
     setGenerating(true);
     setError(null);
     try {
-      const response = await fetch("/api/plan/generate", {
+      const response = await authFetch("/api/plan/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ context, planDate: selectedDate }),
@@ -111,14 +112,28 @@ export default function PlanDashboard() {
       const payload = (await response.json()) as {
         plan?: DailyPlan;
         error?: string;
+        reason?: string;
       };
       if (!response.ok || !payload.plan) {
-        throw new Error(payload.error ?? "Не удалось сгенерировать план");
+        const detail = payload.reason ?? payload.error;
+        if (response.status === 401) {
+          throw new Error(
+            "Сессия истекла. Войдите через Google на главной и попробуйте снова.",
+          );
+        }
+        throw new Error(detail ?? "Не удалось сгенерировать план");
       }
       upsertPlan(payload.plan);
       const { error: saveError } = await savePlan(payload.plan);
       if (saveError) {
-        setError(`План создан, но не сохранён в Supabase: ${saveError}`);
+        const migrationHint = /workout_plans|schema cache|relation/i.test(
+          saveError,
+        )
+          ? " Примените миграцию supabase/migrations/202607200003_stage_03_workout_plans.sql в Supabase SQL Editor."
+          : "";
+        setError(
+          `План на экране есть, но не сохранён в Supabase: ${saveError}.${migrationHint}`,
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка генерации плана");

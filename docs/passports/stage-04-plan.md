@@ -75,6 +75,9 @@
 - `src/components/plan/TodayExerciseCards.tsx` — карточки упражнений дня (подходы×повторы, отдых, инвентарь, подсказка), советы плана, кнопка генерации/обновления.
 - `src/components/plan/PlanAtlasPanel.tsx` — замороженный `AtlasViewer` в `mode: "plan"` + легенда + проценты восстановления пяти групп.
 - `src/components/plan/StartWorkoutButton.tsx` — точечное переоткрытие 2026-07-23: заглушка заменена на активную ссылку `[ START WORKOUT ]` → `/workout` при наличии плана дня; без плана кнопка остаётся неактивной. Других изменений в файлах Этапа 3 нет.
+- `src/components/plan/PlanDashboard.tsx` — точечное переоткрытие 2026-07-25: `authFetch` с Bearer-токеном для `/api/plan/generate`, понятные ошибки 401 и миграции.
+- `src/app/api/plan/generate/route.ts` — точечное переоткрытие 2026-07-25: `getRouteAuth` (cookies + Bearer).
+- `src/lib/supabase/routeAuth.ts`, `src/lib/supabase/authFetch.ts` — общий auth для Route Handlers и клиентских fetch (новые, вне заморозки Этапа 1).
 - `src/components/plan/PlanDashboard.tsx` — оркестрация: загрузка контекста, экран «Нужен вход» без сессии, обновление данных при смене месяца, генерация и сохранение плана.
 - `src/app/plan/page.tsx` — страница маршрута `/plan`.
 

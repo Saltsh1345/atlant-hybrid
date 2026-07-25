@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { generateDailyPlan } from "@/lib/plan/generatePlanWithGemini";
 import type { PlanGenerationContext } from "@/lib/plan/types";
+import { getRouteAuth } from "@/lib/supabase/routeAuth";
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createServerSupabaseClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase не сконфигурирован" },
-        { status: 503 },
-      );
-    }
-
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) {
+    const { user } = await getRouteAuth(req);
+    if (!user) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 

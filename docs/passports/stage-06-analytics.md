@@ -70,6 +70,9 @@
 - `src/components/analytics/AnalyticsSummaryCard.tsx` — резюме Gemini + тоннаж/ккал.
 - `src/components/analytics/AnalyticsDashboard.tsx` — оркестрация экрана.
 - `src/app/analytics/page.tsx` — маршрут `/analytics`.
+- `src/lib/supabase/routeAuth.ts`, `src/lib/supabase/authFetch.ts` — auth для Route Handlers (cookies + Bearer); используется также точечным переоткрытием Этапа 3.
+- `src/components/analytics/AnalyticsDashboard.tsx` — `authFetch` для `/api/analytics/summary` (2026-07-25).
+- `src/app/api/analytics/summary/route.ts` — `getRouteAuth` вместо только cookie-сессии (2026-07-25).
 - `docs/PROGRESS.md` — статус этапа.
 - `docs/passports/stage-06-analytics.md` — этот паспорт.
 

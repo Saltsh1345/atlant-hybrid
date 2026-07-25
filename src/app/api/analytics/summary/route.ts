@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { generateAnalyticsSummary } from "@/lib/analytics/generateAnalyticsSummary";
+import { getRouteAuth } from "@/lib/supabase/routeAuth";
 import type {
   AnalyticsSessionRow,
   SessionSummaryPayload,
@@ -10,18 +10,8 @@ export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createServerSupabaseClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase не сконфигурирован" },
-        { status: 503 },
-      );
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const { user, supabase } = await getRouteAuth(req);
+    if (!user || !supabase) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
