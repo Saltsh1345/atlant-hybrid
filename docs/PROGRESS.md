@@ -10,13 +10,11 @@
 
 ## Текущий этап
 
-**Этап 5 — `/analytics` аналитика и прогресс**
+**Нет активного этапа**
 
-Статус: `ОЖИДАЕТ ПРИЁМКИ`
+Этапы 0–5 и 3D-подэтап заморожены. Следующий этап — только по явной команде владельца и новому паспорту.
 
-Паспорт: [passports/stage-06-analytics.md](passports/stage-06-analytics.md)
-
-Этапы 0–4 и 3D-подэтап заморожены.
+Google Docs паспорта Этапа 5: https://docs.google.com/open?id=1lelKEJiJep8yecBTxOUm0CtHxgxd-us-1CEz3mFIb4w
 
 Google Docs паспорта Этапа 3: https://docs.google.com/open?id=1gJHbpagDo_ePsf5rrAcz7hAQQ6GCRt8KvIFY_hI_9ic
 
@@ -43,7 +41,7 @@ Google Docs паспорта Этапа 1: https://docs.google.com/open?id=1HNAr
 ### Этап 2 — `/scan`
 
 - Статус: `ЗАВЕРШЁН — ЗАМОРОЖЕН`
-- Принят: 2026-07-20
+- Принят: 2026-07-20; силуэт и стабильность захвата — 2026-07-26
 - Паспорт: [passports/stage-02-scan.md](passports/stage-02-scan.md)
 - Google Docs: https://docs.google.com/open?id=10K_b8zAnYaxnM9-WAodgGaoH-PzZ8T-qrLfam-RwGyE
 
@@ -69,8 +67,10 @@ Google Docs паспорта Этапа 1: https://docs.google.com/open?id=1HNAr
 
 ### Этап 5 — `/analytics`
 
-- Статус: `ОЖИДАЕТ ПРИЁМКИ`
+- Статус: `ЗАВЕРШЁН — ЗАМОРОЖЕН`
+- Принят: 2026-07-26
 - Паспорт: [passports/stage-06-analytics.md](passports/stage-06-analytics.md)
+- Google Docs: https://docs.google.com/open?id=1lelKEJiJep8yecBTxOUm0CtHxgxd-us-1CEz3mFIb4w
 
 ## Журнал решений
 
@@ -114,7 +114,13 @@ Google Docs паспорта Этапа 1: https://docs.google.com/open?id=1HNAr
 ### 2026-07-23 — точечное переоткрытие Этапа 2 (силуэт)
 
 - По запросу владельца улучшен контур скана: анатомический SVG front (A-pose) / side (профиль), EMA-сглаживание landmarks, gate с допуском провалов, более частая оценка позы.
-- Этап 5 `/analytics` по-прежнему `ОЖИДАЕТ ПРИЁМКИ`.
+
+### 2026-07-26 — приёмка Этапа 5 и завершение Этапа 2 (силуэт)
+
+- Владелец принял Этап 5 `/analytics`: атлас post-workout, Recharts, Gemini-резюме, `analytics_reports`. Этап заморожен (commits `5132f25`, `03e2dbf`).
+- Принята точечная доработка Этапа 2 (силуэт 2026-07-23 + стабильность захвата и ссылка на `/plan` 2026-07-25): полная заморозка Этапа 2 подтверждена (commits `2333ee9`, `03e2dbf`).
+- Активный этап отсутствует; следующий — только по явной команде.
+- Google Docs Этапа 5: https://docs.google.com/open?id=1lelKEJiJep8yecBTxOUm0CtHxgxd-us-1CEz3mFIb4w
 
 ### 2026-07-25 — точечное переоткрытие Этапа 3 (генерация плана)
 
