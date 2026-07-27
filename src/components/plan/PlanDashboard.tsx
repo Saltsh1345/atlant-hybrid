@@ -4,16 +4,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePlanStore, toDateKey } from "@/store/planStore";
 import { loadPlanContext } from "@/lib/plan/planContext";
+import { buildConstraintProfile } from "@/lib/training/corrective/buildConstraintProfile";
+import type { TrainingIntakeRecord } from "@/lib/training/intake/types";
 import {
   loadPlansInRange,
   loadSessionsInRange,
   savePlan,
 } from "@/lib/plan/persistPlan";
 import type { DailyPlan } from "@/lib/plan/types";
+import { loadActiveProgram } from "@/lib/training/program/persistProgram";
+import type { StoredTrainingProgram } from "@/lib/training/program/types";
 import PlanCalendar from "@/components/plan/PlanCalendar";
 import TodayExerciseCards from "@/components/plan/TodayExerciseCards";
 import PlanAtlasPanel from "@/components/plan/PlanAtlasPanel";
 import StartWorkoutButton from "@/components/plan/StartWorkoutButton";
+import TrainingIntakeWizard from "@/components/training/TrainingIntakeWizard";
 import { authFetch } from "@/lib/supabase/authFetch";
 
 function monthRange(monthDate: Date): { from: string; to: string } {
@@ -47,6 +52,13 @@ export default function PlanDashboard() {
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
   const [needsAuth, setNeedsAuth] = useState(false);
+  const [intake, setIntake] = useState<TrainingIntakeRecord | null | undefined>(
+    undefined,
+  );
+  const [activeProgram, setActiveProgram] = useState<StoredTrainingProgram | null>(
+    null,
+  );
+  const [generatingProgram, setGeneratingProgram] = useState(false);
 
   const refreshMonth = useCallback(
     async (target: Date) => {
@@ -71,10 +83,14 @@ export default function PlanDashboard() {
         if (cancelled) return;
         if (!loaded) {
           setNeedsAuth(true);
+          setIntake(null);
           setLoadState("ready");
           return;
         }
         setContext(loaded.context);
+        setIntake(loaded.context.trainingIntake ?? null);
+        const program = await loadActiveProgram();
+        if (!cancelled) setActiveProgram(program);
         await refreshMonth(monthDate);
         if (!cancelled) setLoadState("ready");
       } catch (e) {
@@ -97,6 +113,15 @@ export default function PlanDashboard() {
       void refreshMonth(next);
     },
     [refreshMonth],
+  );
+
+  const handleIntakeComplete = useCallback(
+    async (record: TrainingIntakeRecord) => {
+      setIntake(record);
+      const loaded = await loadPlanContext();
+      if (loaded) setContext(loaded.context);
+    },
+    [setContext],
   );
 
   const generatePlan = useCallback(async () => {
@@ -142,7 +167,78 @@ export default function PlanDashboard() {
     }
   }, [context, generating, selectedDate, setGenerating, setError, upsertPlan]);
 
+  const generateProgram = useCallback(async () => {
+    if (!context || generatingProgram) return;
+    setGeneratingProgram(true);
+    setError(null);
+    try {
+      const response = await authFetch("/api/training/program/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: selectedDate }),
+      });
+      const payload = (await response.json()) as {
+        programId?: string;
+        plansSaved?: number;
+        title?: string;
+        weeksTotal?: number;
+        dailyPlans?: Array<{ planDate: string; title: string }>;
+        error?: string;
+        reason?: string;
+      };
+      if (!response.ok || !payload.programId) {
+        const detail = payload.reason ?? payload.error;
+        if (response.status === 401) {
+          throw new Error(
+            "Сессия истекла. Войдите через Google на главной и попробуйте снова.",
+          );
+        }
+        throw new Error(detail ?? "Не удалось создать программу");
+      }
+
+      for (const day of payload.dailyPlans ?? []) {
+        const existing = plans[day.planDate];
+        if (existing) {
+          upsertPlan({ ...existing, title: day.title });
+        }
+      }
+
+      const program = await loadActiveProgram();
+      setActiveProgram(program);
+      await refreshMonth(monthDate);
+
+      const reloaded = await loadPlansInRange(
+        monthRange(monthDate).from,
+        monthRange(monthDate).to,
+      );
+      setPlans(reloaded);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка создания программы");
+    } finally {
+      setGeneratingProgram(false);
+    }
+  }, [
+    context,
+    generatingProgram,
+    selectedDate,
+    setError,
+    upsertPlan,
+    plans,
+    monthDate,
+    refreshMonth,
+    setPlans,
+  ]);
+
   const selectedPlan = plans[selectedDate] ?? null;
+
+  const constraintSummary = useMemo(() => {
+    if (!context) return null;
+    return buildConstraintProfile({
+      bioScan: context.bioScan,
+      healthConcerns: intake?.healthConcerns ?? [],
+      notes: intake?.notes ?? null,
+    }).summaryRu;
+  }, [context, intake]);
 
   const planDates = useMemo(() => new Set(Object.keys(plans)), [plans]);
   const sessionDates = useMemo(
@@ -150,7 +246,7 @@ export default function PlanDashboard() {
     [sessions],
   );
 
-  if (loadState === "loading" || loadState === "idle") {
+  if (loadState === "loading" || loadState === "idle" || intake === undefined) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#04070d]">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent" />
@@ -178,6 +274,17 @@ export default function PlanDashboard() {
     );
   }
 
+  if (!intake) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#04070d] px-4 py-8">
+        <TrainingIntakeWizard
+          bioScan={context?.bioScan}
+          onComplete={(record) => void handleIntakeComplete(record)}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#04070d] px-4 py-6 text-zinc-100 sm:px-6">
       <div className="mx-auto max-w-5xl">
@@ -186,9 +293,26 @@ export default function PlanDashboard() {
             ПЛАН ТРЕНИРОВОК
           </h1>
           <p className="mt-1 text-xs text-zinc-500">
-            Готовность: {context?.readinessOverall ?? "—"}% · план строится по
-            профилю, скану осанки и истории тренировок
+            {intake.programWeeksFinal} нед. · {intake.daysPerWeek} дн/нед ·{" "}
+            {intake.trainingLocation === "home"
+              ? "дом"
+              : intake.trainingLocation === "gym"
+                ? "зал"
+                : "гибрид"}{" "}
+            · готовность {context?.readinessOverall ?? "—"}%
+            {activeProgram && (
+              <>
+                {" "}
+                · программа «{activeProgram.title}» (нед.{" "}
+                {activeProgram.currentWeek}/{activeProgram.weeksTotal})
+              </>
+            )}
           </p>
+          {constraintSummary && (
+            <p className="mt-2 text-[0.65rem] leading-relaxed text-violet-200/80">
+              {constraintSummary}
+            </p>
+          )}
         </header>
 
         {error && (
@@ -214,12 +338,27 @@ export default function PlanDashboard() {
           </div>
 
           <div className="flex flex-col gap-4">
+            {!activeProgram && (
+              <button
+                type="button"
+                disabled={generatingProgram}
+                onClick={() => void generateProgram()}
+                className="w-full rounded-2xl border border-violet-300/40 bg-violet-400/10 px-6 py-4 text-center text-sm font-bold tracking-[0.1em] text-violet-100 transition hover:bg-violet-400/20 disabled:opacity-50"
+              >
+                {generatingProgram
+                  ? "СОЗДАЁМ ПРОГРАММУ…"
+                  : `СОЗДАТЬ ПРОГРАММУ НА ${intake.programWeeksFinal} НЕД.`}
+              </button>
+            )}
             <TodayExerciseCards
               plan={selectedPlan}
               generating={generating}
               onGenerate={() => void generatePlan()}
             />
-            <StartWorkoutButton hasPlan={selectedPlan !== null} />
+            <StartWorkoutButton
+              hasPlan={selectedPlan !== null}
+              planDate={selectedDate}
+            />
           </div>
         </div>
       </div>

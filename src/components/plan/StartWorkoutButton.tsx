@@ -4,6 +4,7 @@ import Link from "next/link";
 
 export interface StartWorkoutButtonProps {
   hasPlan: boolean;
+  planDate?: string;
 }
 
 const BASE_CLASS =
@@ -13,7 +14,10 @@ const BASE_CLASS =
  * Ведёт в live-режим `/workout`. Пока на выбранный день нет плана,
  * кнопка остаётся неактивной.
  */
-export default function StartWorkoutButton({ hasPlan }: StartWorkoutButtonProps) {
+export default function StartWorkoutButton({
+  hasPlan,
+  planDate,
+}: StartWorkoutButtonProps) {
   if (!hasPlan) {
     return (
       <button
@@ -27,9 +31,11 @@ export default function StartWorkoutButton({ hasPlan }: StartWorkoutButtonProps)
     );
   }
 
+  const href = planDate ? `/workout?date=${planDate}` : "/workout";
+
   return (
     <Link
-      href="/workout"
+      href={href}
       className={`${BASE_CLASS} border-cyan-200/50 bg-cyan-300 text-black shadow-[0_0_35px_rgba(34,211,238,0.28)] hover:bg-cyan-200`}
     >
       [ START WORKOUT ]

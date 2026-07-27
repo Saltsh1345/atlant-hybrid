@@ -8,6 +8,10 @@ import {
   exerciseById,
   type ExerciseDef,
 } from "@/lib/training/exerciseCatalog";
+import { buildIntelligentPlanningContext } from "@/lib/training/program/buildPlanningContext";
+import { equipmentAllowedAtLocation } from "@/lib/training/science/rules";
+import { constraintProfileFromContext } from "@/lib/training/program/exerciseGuards";
+import { applyCorrectiveLayerToPlanExercises } from "@/lib/training/corrective/applyCorrectiveLayer";
 import type {
   DailyPlan,
   PlanExercise,
@@ -16,18 +20,6 @@ import type {
 import { notRecoveredGroupNames } from "@/lib/plan/readinessToAtlas";
 
 const PLAN_DEADLINE_MS = Number(process.env.GEMINI_ANALYSIS_TIMEOUT_MS ?? 45000);
-
-/** Осевая нагрузка на поясницу → замена при вероятном гиперлордозе. */
-const HYPERLORDOSIS_SWAP: Record<string, string> = {
-  squat: "leg_press",
-  deadlift: "hip_thrust",
-  romanian_deadlift: "leg_curl",
-  overhead_press: "lateral_raise",
-  barbell_row: "seated_row",
-};
-
-const HYPERLORDOSIS_TIP =
-  "Обнаружены признаки гиперлордоза: осевые упражнения заменены на варианты без нагрузки на поясницу. Держите кор в тонусе и контролируйте нейтральное положение таза.";
 
 interface GeminiPlanJson {
   title?: string;
@@ -42,11 +34,16 @@ interface GeminiPlanJson {
   tips?: string[];
 }
 
-function catalogForPrompt(): string {
-  return EXERCISE_CATALOG.map(
-    (e) =>
-      `${e.id} — ${e.name} (${e.sport}, ${e.category}, группы: ${e.muscleGroups.join("/")}${e.equipment ? `, инвентарь: ${e.equipment}` : ""})`,
-  ).join("\n");
+function catalogForPrompt(context: PlanGenerationContext): string {
+  const location = context.trainingIntake?.trainingLocation;
+  return EXERCISE_CATALOG.filter(
+    (e) => !location || equipmentAllowedAtLocation(location, e.equipment),
+  )
+    .map(
+      (e) =>
+        `${e.id} — ${e.name} (${e.sport}, ${e.category}, группы: ${e.muscleGroups.join("/")}${e.equipment ? `, инвентарь: ${e.equipment}` : ""})`,
+    )
+    .join("\n");
 }
 
 function buildPrompt(context: PlanGenerationContext, planDate: string): string {
@@ -59,16 +56,22 @@ function buildPrompt(context: PlanGenerationContext, planDate: string): string {
     )
     .join("\n");
 
-  return `Составь план тренировки на ${planDate} для пользователя фитнес-приложения.
+  const intakeBlock = context.trainingIntake
+    ? `\n${buildIntelligentPlanningContext(context.trainingIntake, context)}\n`
+    : context.bioScan
+      ? `\n${context.bioScan.promptBlock}\n`
+      : "";
 
+  const constraintBlock = `\n${constraintProfileFromContext(context).promptBlock}\n`;
+
+  return `Составь план тренировки на ${planDate} для пользователя фитнес-приложения.
+${intakeBlock}${constraintBlock}
 Профиль:
 Рост: ${context.heightCm ?? "нет данных"} см
-Вес: ${context.weightKg ?? "нет данных"} кг
+Вес тела: ${context.weightKg ?? "нет данных"} кг
 Возраст: ${context.age ?? "нет данных"}
-Жир: ${context.bodyFatPercentage ?? "нет данных"}%
-Гиперлордоз вероятен: ${context.hyperlordosisLikely === true ? "да" : context.hyperlordosisLikely === false ? "нет" : "нет данных"}
+Жир (Health/профиль): ${context.bodyFatPercentage ?? "нет данных"}%
 Антропометрия скана: ${context.anthropometrics ? JSON.stringify(context.anthropometrics) : "нет данных"}
-Осанка (боковой скан): ${context.posture ? JSON.stringify(context.posture) : "нет данных"}
 
 Восстановление мышечных групп (0-100):
 ${context.readinessGroups.map((g) => `${g.name}: ${g.percent}%`).join("\n")}
@@ -78,13 +81,14 @@ ${context.readinessGroups.map((g) => `${g.name}: ${g.percent}%`).join("\n")}
 ${sessions || "истории нет"}
 
 Каталог упражнений (используй ТОЛЬКО эти exerciseId):
-${catalogForPrompt()}
+${catalogForPrompt(context)}
 
 Правила:
 1. 3-5 упражнений, суммарно 25-60 минут.
 2. Не давай тяжёлую нагрузку на невосстановленные группы.
-3. При вероятном гиперлордозе исключи осевую нагрузку на поясницу (squat, deadlift, romanian_deadlift, overhead_press, barbell_row).
-4. tips — 2-4 коротких совета на русском.
+3. Учитывай ВСЕ находки биоверификации и ограничения клиента — замены и коррекционные упражнения.
+4. Сохраняй силовой характер дня; при ограничениях — безопасные варианты + prehab (кор, ягодицы, ротатор).
+5. tips — 2-4 коротких совета на русском.
 
 Ответ строго JSON без markdown:
 {"title": "...", "focus": "strength|boxing|tennis", "durationMin": 40, "exercises": [{"exerciseId": "...", "sets": 3, "reps": 10, "restSec": 60}], "tips": ["..."]}`;
@@ -108,26 +112,6 @@ function toPlanExercise(
   };
 }
 
-function applyHyperlordosisGuard(
-  exercises: PlanExercise[],
-  hyperlordosisLikely: boolean | null,
-): { exercises: PlanExercise[]; swapped: boolean } {
-  if (hyperlordosisLikely !== true) return { exercises, swapped: false };
-
-  let swapped = false;
-  const seen = new Set(exercises.map((e) => e.exerciseId));
-  const result = exercises.map((exercise) => {
-    const replacementId = HYPERLORDOSIS_SWAP[exercise.exerciseId];
-    if (!replacementId || seen.has(replacementId)) return exercise;
-    const def = exerciseById(replacementId);
-    if (!def) return exercise;
-    swapped = true;
-    seen.add(replacementId);
-    return toPlanExercise(def, exercise.sets, exercise.reps, exercise.restSec);
-  });
-  return { exercises: result, swapped };
-}
-
 function finalizePlan(
   context: PlanGenerationContext,
   planDate: string,
@@ -141,11 +125,23 @@ function finalizePlan(
   },
   reason?: string,
 ): DailyPlan {
-  const { exercises, swapped } = applyHyperlordosisGuard(
+  const intake = context.trainingIntake;
+  const location = intake?.trainingLocation ?? "gym";
+  const experience = intake?.experienceLevel ?? "intermediate";
+
+  const { exercises, tips: correctionTips } = applyCorrectiveLayerToPlanExercises(
     base.exercises,
-    context.hyperlordosisLikely,
+    {
+      location,
+      deload: false,
+      experienceLevel: experience,
+      constraints: constraintProfileFromContext(context),
+      maxCorrectives: 2,
+      maxExercises: 6,
+    },
   );
-  const tips = swapped ? [HYPERLORDOSIS_TIP, ...base.tips] : base.tips;
+
+  const tips = [...correctionTips, ...base.tips].slice(0, 6);
 
   return {
     planDate,
@@ -154,7 +150,7 @@ function finalizePlan(
     durationMin: Math.max(5, Math.min(180, Math.round(base.durationMin))),
     source,
     exercises,
-    tips: tips.slice(0, 5),
+    tips,
     notRecoveredGroups: notRecoveredGroupNames(context.readinessGroups),
     targetMeshes: Array.from(
       new Set(exercises.flatMap((e) => e.targetMuscles)),

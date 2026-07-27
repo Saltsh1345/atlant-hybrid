@@ -10,9 +10,13 @@
 
 ## Текущий этап
 
-**Нет активного этапа**
+**Этап 6 — умный тренинг (опросник, программа, история подходов)**
 
-Этапы 0–5 и 3D-подэтап заморожены. Следующий этап — только по явной команде владельца и новому паспорту.
+Статус: `ОЖИДАЕТ ПРИЁМКИ` (6A + 6B + 6C)
+
+Паспорт: [passports/stage-07-intelligent-training.md](passports/stage-07-intelligent-training.md)
+
+Этапы 0–5 и 3D-подэтап заморожены.
 
 Google Docs паспорта Этапа 5: https://docs.google.com/open?id=1lelKEJiJep8yecBTxOUm0CtHxgxd-us-1CEz3mFIb4w
 
@@ -72,6 +76,12 @@ Google Docs паспорта Этапа 1: https://docs.google.com/open?id=1HNAr
 - Паспорт: [passports/stage-06-analytics.md](passports/stage-06-analytics.md)
 - Google Docs: https://docs.google.com/open?id=1lelKEJiJep8yecBTxOUm0CtHxgxd-us-1CEz3mFIb4w
 
+### Этап 6 — умный тренинг
+
+- Статус: `ОЖИДАЕТ ПРИЁМКИ`
+- Паспорт: [passports/stage-07-intelligent-training.md](passports/stage-07-intelligent-training.md)
+- Подэтапы: 6A (intake), 6B (программа), 6C (live workout + weight_kg); 6D в очереди
+
 ## Журнал решений
 
 ### 2026-07-19
@@ -115,11 +125,22 @@ Google Docs паспорта Этапа 1: https://docs.google.com/open?id=1HNAr
 
 - По запросу владельца улучшен контур скана: анатомический SVG front (A-pose) / side (профиль), EMA-сглаживание landmarks, gate с допуском провалов, более частая оценка позы.
 
+### 2026-07-27 — Этап 6: 6B + 6C
+
+- Реализован engine полной программы 4–12 нед.: `generateProgram`, `persistProgram`, API `/api/training/program/generate`, кнопка на `/plan`.
+- `/workout` переведён на plan-driven flow: упражнение → подход → ввод `weight_kg` → `workout_set_logs`.
+- REST-проверка: миграция `202607270001_stage_06_training_intelligence.sql` **не применена** (404). Требуется SQL Editor.
+- Паспорт stage-07 → `ОЖИДАЕТ ПРИЁМКИ`.
+
+### 2026-07-27 — начало Этапа 6 (умный тренинг)
+
+- По команде владельца начат Этап 6: опросник целей/опыта/локации, рекомендация длины программы 4–12 нед., миграция intake/programs/set_logs, расширение контекста Gemini биоскан + science rules.
+- Подэтапы 6B (полная программа), 6C (live `/workout` + вес снаряда), 6D (прогрессия) — в очереди.
+
 ### 2026-07-26 — приёмка Этапа 5 и завершение Этапа 2 (силуэт)
 
 - Владелец принял Этап 5 `/analytics`: атлас post-workout, Recharts, Gemini-резюме, `analytics_reports`. Этап заморожен (commits `5132f25`, `03e2dbf`).
 - Принята точечная доработка Этапа 2 (силуэт 2026-07-23 + стабильность захвата и ссылка на `/plan` 2026-07-25): полная заморозка Этапа 2 подтверждена (commits `2333ee9`, `03e2dbf`).
-- Активный этап отсутствует; следующий — только по явной команде.
 - Google Docs Этапа 5: https://docs.google.com/open?id=1lelKEJiJep8yecBTxOUm0CtHxgxd-us-1CEz3mFIb4w
 
 ### 2026-07-25 — точечное переоткрытие Этапа 3 (генерация плана)

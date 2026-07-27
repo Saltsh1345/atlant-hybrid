@@ -1,5 +1,5 @@
-import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { loadTrainingIntake } from "@/lib/training/intake/loadTrainingIntake";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadTrainingIntakeServer } from "@/lib/training/intake/loadTrainingIntakeServer";
 import { goalToLegacyFitnessGoal } from "@/lib/training/intake/suggestProgramWeeks";
 import { buildBioScanProfile } from "@/lib/training/bioScan/buildBioScanProfile";
 import type { BioScanProfile } from "@/lib/training/bioScan/buildBioScanProfile";
@@ -39,40 +39,33 @@ export interface LoadedPlanContext {
   context: PlanGenerationContext;
 }
 
-/**
- * Читает контекст пользователя для генерации плана:
- * профиль (рост/вес/осанка/антропометрия), последний скан и историю тренировок.
- */
-export async function loadPlanContext(): Promise<LoadedPlanContext | null> {
-  const supabase = createBrowserSupabaseClient();
-  if (!supabase) return null;
-
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  if (!user) return null;
-
+/** Серверная загрузка контекста для Route Handlers. */
+export async function loadPlanContextServer(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<LoadedPlanContext | null> {
   const [profileRes, scanRes, sessionsRes, intake] = await Promise.all([
     supabase
       .from("profiles")
       .select(
         "height_cm, weight_kg, age, body_fat_percentage, hyperlordosis_likely, scan_anthropometrics",
       )
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle(),
     supabase
       .from("body_scans")
       .select("captured_at, quality_score, result")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("captured_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
       .from("workout_sessions")
       .select("id, completed_at, sport, exercise, duration_sec, form_score")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("completed_at", { ascending: false })
       .limit(10),
-    loadTrainingIntake(),
+    loadTrainingIntakeServer(supabase, userId),
   ]);
 
   const profile = (profileRes.data ?? null) as ProfileContextRow | null;
@@ -98,7 +91,7 @@ export async function loadPlanContext(): Promise<LoadedPlanContext | null> {
   const trainingIntake = intake ?? null;
 
   return {
-    userId: user.id,
+    userId,
     context: {
       heightCm: profile?.height_cm ?? null,
       weightKg: profile?.weight_kg ?? null,
@@ -107,10 +100,10 @@ export async function loadPlanContext(): Promise<LoadedPlanContext | null> {
       hyperlordosisLikely:
         bioScan.hyperlordosisLikely ?? profile?.hyperlordosis_likely ?? null,
       anthropometrics:
-        scanResult?.anthropometrics ??
-        profile?.scan_anthropometrics ??
-        null,
-      posture: scanResult?.posture ?? null,
+        (scanResult?.anthropometrics ??
+          profile?.scan_anthropometrics ??
+          null) as Record<string, unknown> | null,
+      posture: (scanResult?.posture ?? null) as Record<string, unknown> | null,
       bioScan,
       goal: trainingIntake
         ? goalToLegacyFitnessGoal(trainingIntake.primaryGoal)

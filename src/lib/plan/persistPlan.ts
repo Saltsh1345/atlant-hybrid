@@ -2,6 +2,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import type { DailyPlan, PlanExercise, PlanSessionRow } from "@/lib/plan/types";
 
 interface WorkoutPlanRow {
+  id?: string;
   plan_date: string;
   source: "gemini" | "fallback";
   title: string;
@@ -12,10 +13,14 @@ interface WorkoutPlanRow {
   target_meshes: string[];
   not_recovered_groups: string[];
   reason: string | null;
+  program_id?: string | null;
+  week_index?: number | null;
+  day_index?: number | null;
 }
 
 function rowToPlan(row: WorkoutPlanRow): DailyPlan {
   return {
+    id: row.id,
     planDate: row.plan_date,
     source: row.source,
     title: row.title,
@@ -26,6 +31,9 @@ function rowToPlan(row: WorkoutPlanRow): DailyPlan {
     targetMeshes: row.target_meshes ?? [],
     notRecoveredGroups: row.not_recovered_groups ?? [],
     reason: row.reason ?? undefined,
+    programId: row.program_id ?? null,
+    weekIndex: row.week_index ?? null,
+    dayIndex: row.day_index ?? null,
   };
 }
 
@@ -38,23 +46,28 @@ export async function savePlan(plan: DailyPlan): Promise<{ error?: string }> {
   const user = userData?.user;
   if (!user) return { error: "Не авторизован" };
 
-  const { error } = await supabase.from("workout_plans").upsert(
-    {
-      user_id: user.id,
-      plan_date: plan.planDate,
-      source: plan.source,
-      title: plan.title,
-      focus: plan.focus,
-      duration_min: plan.durationMin,
-      exercises: plan.exercises,
-      tips: plan.tips,
-      target_meshes: plan.targetMeshes,
-      not_recovered_groups: plan.notRecoveredGroups,
-      reason: plan.reason ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,plan_date" },
-  );
+  const payload: Record<string, unknown> = {
+    user_id: user.id,
+    plan_date: plan.planDate,
+    source: plan.source,
+    title: plan.title,
+    focus: plan.focus,
+    duration_min: plan.durationMin,
+    exercises: plan.exercises,
+    tips: plan.tips,
+    target_meshes: plan.targetMeshes,
+    not_recovered_groups: plan.notRecoveredGroups,
+    reason: plan.reason ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (plan.programId !== undefined) payload.program_id = plan.programId;
+  if (plan.weekIndex !== undefined) payload.week_index = plan.weekIndex;
+  if (plan.dayIndex !== undefined) payload.day_index = plan.dayIndex;
+
+  const { error } = await supabase.from("workout_plans").upsert(payload, {
+    onConflict: "user_id,plan_date",
+  });
 
   return error ? { error: error.message } : {};
 }
@@ -74,7 +87,7 @@ export async function loadPlansInRange(
   const { data } = await supabase
     .from("workout_plans")
     .select(
-      "plan_date, source, title, focus, duration_min, exercises, tips, target_meshes, not_recovered_groups, reason",
+      "id, plan_date, source, title, focus, duration_min, exercises, tips, target_meshes, not_recovered_groups, reason, program_id, week_index, day_index",
     )
     .eq("user_id", user.id)
     .gte("plan_date", fromDate)
@@ -82,6 +95,14 @@ export async function loadPlansInRange(
     .order("plan_date", { ascending: true });
 
   return ((data ?? []) as WorkoutPlanRow[]).map(rowToPlan);
+}
+
+/** Загружает один план по дате. */
+export async function loadPlanByDate(
+  planDate: string,
+): Promise<DailyPlan | null> {
+  const plans = await loadPlansInRange(planDate, planDate);
+  return plans[0] ?? null;
 }
 
 /** Загружает выполненные тренировки за диапазон дат (для календаря истории). */
