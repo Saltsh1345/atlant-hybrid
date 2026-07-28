@@ -27,7 +27,7 @@
   - `src/components/workout/WorkoutLiveScreen.tsx`, `WorkoutHUD.tsx`, `WorkoutAtlasPanel.tsx`
   - `src/lib/workout/types.ts`, `persistWorkoutSession.ts`, `loadWorkoutProfile.ts`
   - `src/store/workoutStore.ts`
-- **Новые пути 6C:** `src/lib/workout/loadWorkoutPlan.ts`, `persistSetLog.ts`, `src/components/workout/WorkoutSetPanel.tsx`
+- **Точечное переоткрытие Этапа 2 (экран результатов /scan):** `src/components/scan/ScanFlow.tsx` — полный вывод `buildBioScanProfile`, не только гиперлордоз/таз.
 - `docs/PROGRESS.md`, `docs/HANDOFF.md`, этот паспорт.
 
 ## Запрещённые изменения
@@ -94,9 +94,11 @@
 | REST `user_training_intake` | **404 — миграция stage_06 НЕ применена** (2026-07-27) |
 | `npx tsc --noEmit` | ошибки только в Avatar3D (не часть этапа) |
 
-### 6E — коррекционный слой (новые)
+### 6E (коррекционный слой + UI findings)
 
-- `src/lib/training/corrective/types.ts`, `buildConstraintProfile.ts`, `exerciseMeta.ts`, `applyCorrectiveLayer.ts`
+- `src/lib/training/corrective/**`
+- `src/components/training/BioScanFindingsPanel.tsx` — полный список findings на `/scan`
+- `src/components/scan/ScanFlow.tsx` — экран «Био-скан сохранён» (переоткрытие Этапа 2)
 - `supabase/migrations/202607270002_stage_06_health_concerns.sql`
 - `TrainingIntakeWizard` — шаг «Здоровье»; `healthConcerns` в intake
 - `generatePlanWithGemini.ts`, `exerciseGuards.ts` — единый слой вместо только гиперлордоза

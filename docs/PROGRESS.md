@@ -12,7 +12,7 @@
 
 **Этап 6 — умный тренинг (опросник, программа, история подходов)**
 
-Статус: `ОЖИДАЕТ ПРИЁМКИ` (6A + 6B + 6C)
+Статус: `ОЖИДАЕТ ПРИЁМКИ` (6A + 6B + 6C + 6E)
 
 Паспорт: [passports/stage-07-intelligent-training.md](passports/stage-07-intelligent-training.md)
 

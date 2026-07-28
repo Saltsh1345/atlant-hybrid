@@ -4,6 +4,10 @@ import {
   suggestProgramWeeks,
 } from "@/lib/training/intake/suggestProgramWeeks";
 import type { BioScanProfile } from "@/lib/training/bioScan/buildBioScanProfile";
+import {
+  encodeNotesWithHealth,
+  isHealthConcernsSchemaError,
+} from "@/lib/training/intake/healthConcernsCodec";
 import type {
   TrainingIntakeAnswers,
   TrainingIntakeRecord,
@@ -22,8 +26,9 @@ export async function saveTrainingIntake(
   const suggestion = suggestProgramWeeks(answers, bio);
   const finalWeeks = resolveProgramWeeksFinal(answers, suggestion.weeks);
   const letAi = answers.programWeeksChoice === "ai";
+  const completedAt = new Date().toISOString();
 
-  const payload = {
+  const base = {
     user_id: userData.user.id,
     primary_goal: answers.primaryGoal,
     experience_level: answers.experienceLevel,
@@ -33,15 +38,28 @@ export async function saveTrainingIntake(
     program_weeks_suggested: suggestion.weeks,
     program_weeks_final: finalWeeks,
     let_ai_suggest_weeks: letAi,
-    notes: answers.notes?.trim() || null,
-    health_concerns: answers.healthConcerns ?? [],
-    updated_at: new Date().toISOString(),
-    completed_at: new Date().toISOString(),
+    updated_at: completedAt,
+    completed_at: completedAt,
   };
 
-  const { error } = await supabase.from("user_training_intake").upsert(payload, {
-    onConflict: "user_id",
-  });
+  let { error } = await supabase.from("user_training_intake").upsert(
+    {
+      ...base,
+      notes: answers.notes?.trim() || null,
+      health_concerns: answers.healthConcerns ?? [],
+    },
+    { onConflict: "user_id" },
+  );
+
+  if (error && isHealthConcernsSchemaError(error.message)) {
+    ({ error } = await supabase.from("user_training_intake").upsert(
+      {
+        ...base,
+        notes: encodeNotesWithHealth(answers.healthConcerns, answers.notes),
+      },
+      { onConflict: "user_id" },
+    ));
+  }
 
   if (error) return { error: error.message };
 
@@ -51,7 +69,7 @@ export async function saveTrainingIntake(
       programWeeksSuggested: suggestion.weeks,
       programWeeksFinal: finalWeeks,
       letAiSuggestWeeks: letAi,
-      completedAt: payload.completed_at,
+      completedAt,
     },
   };
 }

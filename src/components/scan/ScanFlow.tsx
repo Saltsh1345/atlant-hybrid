@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NormalizedLandmark } from "@/types";
 import CameraStatusOverlay from "@/components/camera/CameraStatusOverlay";
 import PoseOverlay from "@/components/camera/PoseOverlay";
@@ -18,6 +18,8 @@ import {
   saveStatureToProfile,
 } from "@/lib/scan/persistScan";
 import { StablePoseGate } from "@/lib/scan/stablePoseGate";
+import { buildBioScanProfile } from "@/lib/training/bioScan/buildBioScanProfile";
+import BioScanFindingsPanel from "@/components/training/BioScanFindingsPanel";
 import { useScanStore } from "@/store/scanStore";
 import { useUserHealthStore } from "@/store/userHealthStore";
 
@@ -76,6 +78,17 @@ export default function ScanFlow() {
   const setError = useScanStore((state) => state.setError);
   const reset = useScanStore((state) => state.reset);
   const setHealthProfile = useUserHealthStore((state) => state.setProfile);
+  const bodyFatPercent = useUserHealthStore(
+    (state) => state.profile.bodyFatPercentage,
+  );
+
+  const bioScan = useMemo(
+    () =>
+      result
+        ? buildBioScanProfile({ scanResult: result, bodyFatPercent })
+        : null,
+    [result, bodyFatPercent],
+  );
 
   const cameraActive =
     phase === "front" || phase === "side" || phase === "processing";
@@ -401,25 +414,29 @@ export default function ScanFlow() {
                   : "—"
               }
             />
+            {result.anthropometrics ? (
+              <>
+                <Metric
+                  label="Плечи"
+                  value={`${result.anthropometrics.shoulderWidthCm} см`}
+                />
+                <Metric
+                  label="Талия"
+                  value={`${result.anthropometrics.waistWidthCm} см`}
+                />
+                <Metric
+                  label="Бёдра"
+                  value={`${result.anthropometrics.hipWidthCm} см`}
+                />
+                <Metric
+                  label="Размах рук"
+                  value={`${result.anthropometrics.armSpanCm} см`}
+                />
+              </>
+            ) : null}
           </div>
 
-          <div
-            className={`mt-4 rounded-2xl border p-4 ${
-              result.hyperlordosisLikely
-                ? "border-amber-300/30 bg-amber-300/10"
-                : "border-emerald-300/25 bg-emerald-300/10"
-            }`}
-          >
-            <p className="text-sm font-medium">
-              {result.hyperlordosisLikely
-                ? "Есть оценочный признак отклонения таза"
-                : "Выраженный признак отклонения таза не выявлен"}
-            </p>
-            <p className="mt-2 text-xs leading-5 text-zinc-400">
-              {result.posture?.note ??
-                "Недостаточно данных для профильной оценки."}
-            </p>
-          </div>
+          {bioScan ? <BioScanFindingsPanel bioScan={bioScan} /> : null}
 
           {result.quality.issues.length > 0 ? (
             <ul className="mt-4 space-y-1 text-xs text-zinc-500">

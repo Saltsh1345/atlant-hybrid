@@ -1,4 +1,8 @@
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import {
+  decodeHealthFromNotes,
+  isHealthConcernsSchemaError,
+} from "@/lib/training/intake/healthConcernsCodec";
 import type { TrainingIntakeRecord, HealthConcernId } from "@/lib/training/intake/types";
 
 interface IntakeRow {
@@ -16,6 +20,11 @@ interface IntakeRow {
 }
 
 function rowToRecord(row: IntakeRow): TrainingIntakeRecord {
+  const fromNotes = decodeHealthFromNotes(row.notes);
+  const healthConcerns =
+    (row.health_concerns?.length ? row.health_concerns : fromNotes.healthConcerns) ??
+    [];
+
   return {
     primaryGoal: row.primary_goal as TrainingIntakeRecord["primaryGoal"],
     experienceLevel: row.experience_level as TrainingIntakeRecord["experienceLevel"],
@@ -24,8 +33,8 @@ function rowToRecord(row: IntakeRow): TrainingIntakeRecord {
     programWeeksChoice: row.let_ai_suggest_weeks
       ? "ai"
       : (row.program_weeks_requested as TrainingIntakeRecord["programWeeksChoice"]),
-    healthConcerns: (row.health_concerns ?? []) as HealthConcernId[],
-    notes: row.notes ?? undefined,
+    healthConcerns,
+    notes: fromNotes.notes ?? row.notes ?? undefined,
     programWeeksSuggested: row.program_weeks_suggested,
     programWeeksFinal: row.program_weeks_final,
     letAiSuggestWeeks: row.let_ai_suggest_weeks,
@@ -40,13 +49,23 @@ export async function loadTrainingIntake(): Promise<TrainingIntakeRecord | null>
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return null;
 
-  const { data, error } = await supabase
+  const fullSelect =
+    "primary_goal, experience_level, training_location, days_per_week, program_weeks_requested, program_weeks_suggested, program_weeks_final, let_ai_suggest_weeks, notes, health_concerns, completed_at";
+  const legacySelect = fullSelect.replace(", health_concerns", "");
+
+  let { data, error } = await supabase
     .from("user_training_intake")
-    .select(
-      "primary_goal, experience_level, training_location, days_per_week, program_weeks_requested, program_weeks_suggested, program_weeks_final, let_ai_suggest_weeks, notes, health_concerns, completed_at",
-    )
+    .select(fullSelect)
     .eq("user_id", userData.user.id)
     .maybeSingle();
+
+  if (error && isHealthConcernsSchemaError(error.message)) {
+    ({ data, error } = await supabase
+      .from("user_training_intake")
+      .select(legacySelect)
+      .eq("user_id", userData.user.id)
+      .maybeSingle());
+  }
 
   if (error || !data) return null;
   return rowToRecord(data as IntakeRow);
