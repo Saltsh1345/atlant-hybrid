@@ -71,12 +71,28 @@ export default function TodayExerciseCards({
                 {exercise.sets}×{exercise.reps}
               </span>
             </div>
+            {exercise.role && exercise.role !== "main" && (
+              <span
+                className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider ${
+                  exercise.role === "corrective"
+                    ? "bg-violet-500/20 text-violet-200"
+                    : "bg-amber-500/20 text-amber-200"
+                }`}
+              >
+                {exercise.role === "corrective" ? "коррекция" : "замена"}
+              </span>
+            )}
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.65rem] text-zinc-500">
               <span>отдых {exercise.restSec} с</span>
               {exercise.equipment && <span>{exercise.equipment}</span>}
             </div>
+            {exercise.correctionReason && (
+              <p className="mt-1.5 text-xs text-violet-200/90">
+                {exercise.correctionReason}
+              </p>
+            )}
             {exercise.hint && (
-              <p className="mt-1.5 text-xs text-zinc-400">{exercise.hint}</p>
+              <p className="mt-1 text-xs text-zinc-400">{exercise.hint}</p>
             )}
           </div>
         ))}

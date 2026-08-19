@@ -16,9 +16,15 @@ export interface PlanExercise {
   targetMuscles: string[];
   equipment?: string;
   hint?: string;
+  /** main | corrective | substitution — Этап 6 коррекционный слой */
+  role?: "main" | "corrective" | "substitution";
+  /** Почему добавлено/заменено (скан, опросник, комментарий) */
+  correctionReason?: string;
 }
 
 export interface DailyPlan {
+  /** UUID строки в workout_plans (если загружена из Supabase). */
+  id?: string;
   /** YYYY-MM-DD */
   planDate: string;
   title: string;
@@ -32,6 +38,10 @@ export interface DailyPlan {
   /** mesh-имена целевых мышц дня */
   targetMeshes: string[];
   reason?: string;
+  /** Этап 6 — привязка к мезоциклу */
+  programId?: string | null;
+  weekIndex?: number | null;
+  dayIndex?: number | null;
 }
 
 /** Одна выполненная тренировка из Supabase `workout_sessions`. */
@@ -54,6 +64,10 @@ export interface PlanGenerationContext {
   anthropometrics: Record<string, unknown> | null;
   posture: Record<string, unknown> | null;
   goal: string | null;
+  /** Полный профиль биоверификации (скан + жир + пропорции + осанка). */
+  bioScan?: import("@/lib/training/bioScan/buildBioScanProfile").BioScanProfile | null;
+  /** Этап 6 — ответы опросника (если пройден). */
+  trainingIntake?: import("@/lib/training/intake/types").TrainingIntakeRecord | null;
   recentSessions: PlanSessionRow[];
   readinessGroups: { name: string; percent: number }[];
   readinessOverall: number;

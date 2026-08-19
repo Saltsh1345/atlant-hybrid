@@ -57,13 +57,13 @@ Process-controlled files remain writable only for stage bookkeeping:
 - `docs/passports/README.md`
 - `.cursor/rules/10-frozen-stages.mdc`
 
-### Этап 2 — accepted 2026-07-20
+### Этап 2 — accepted 2026-07-20; силуэт и стабильность — accepted 2026-07-26
 
 Read-only files:
 
 - `src/app/scan/page.tsx`
-- `src/components/scan/ScanFlow.tsx` (точечно переоткрыт 2026-07-23: силуэт + сглаживание захвата)
-- `src/lib/scan/stablePoseGate.ts` (точечно переоткрыт 2026-07-23)
+- `src/components/scan/ScanFlow.tsx`
+- `src/lib/scan/stablePoseGate.ts`
 - `src/components/scan/ScanSilhouetteGuide.tsx`
 - `src/lib/scan/landmarkSmoother.ts`
 - `src/lib/scan/postureMetrics.ts`
@@ -126,6 +126,30 @@ Read-only files:
 - `src/lib/workout/buildWorkoutAtlasZones.ts`
 - `src/store/workoutStore.ts`
 - `docs/passports/stage-05-workout.md`
+
+### Этап 5 — accepted 2026-07-26
+
+Read-only files:
+
+- `src/app/analytics/page.tsx`
+- `src/components/analytics/AnalyticsAtlasPanel.tsx`
+- `src/components/analytics/AnalyticsCharts.tsx`
+- `src/components/analytics/AnalyticsDashboard.tsx`
+- `src/components/analytics/AnalyticsSummaryCard.tsx`
+- `src/components/analytics/AnalyticsZoneTooltip.tsx`
+- `src/lib/analytics/analyzeSessionBalance.ts`
+- `src/lib/analytics/estimateSessionLoad.ts`
+- `src/lib/analytics/generateAnalyticsSummary.ts`
+- `src/lib/analytics/loadAnalyticsData.ts`
+- `src/lib/analytics/types.ts`
+- `src/store/analyticsStore.ts`
+- `src/app/api/analytics/summary/route.ts`
+- `src/lib/supabase/routeAuth.ts`
+- `src/lib/supabase/authFetch.ts`
+- `supabase/migrations/202607230001_stage_05_analytics_reports.sql`
+- `docs/passports/stage-06-analytics.md`
+
+Note: `routeAuth` / `authFetch` также используются точечным переоткрытием Этапа 3 (`PlanDashboard`, `/api/plan/generate`).
 
 ## Freeze procedure
 
