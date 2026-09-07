@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Фитнес 100 — фитнес-клуб: зал, групповые, персональный тренинг</title>
+<meta name="description" content="Фитнес-клуб «Фитнес 100»: тренажёрный зал 2000 м², 40+ групповых занятий в неделю, персональные тренеры и диагностика тела. Первая тренировка — бесплатно." />
+<meta name="theme-color" content="#0a0b0d" />
+<meta property="og:title" content="Фитнес 100 — твои 100% начинаются здесь" />
+<meta property="og:description" content="Тренажёрный зал, групповые программы, единоборства и персональный тренинг. Первое занятие бесплатно." />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="ru_RU" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23c8f931'/><text x='50' y='68' font-family='Arial,sans-serif' font-size='52' font-weight='bold' text-anchor='middle' fill='%230a0b0d'>100</text></svg>" />
+</head>
+<body>
+<a class="skip-link" href="#main">К основному содержимому</a>
+
+<!-- ================= ШАПКА ================= -->
+<header class="header" id="header">
+  <div class="container header__inner">
+    <a class="logo" href="#top" aria-label="Фитнес 100 — на главную">
+      <span class="logo__mark">100</span>
+      <span>ФИТНЕС&nbsp;100</span>
+    </a>
+
+    <nav class="nav" aria-label="Основная навигация">
+      <a href="#directions">Направления</a>
+      <a href="#method">Как тренируем</a>
+      <a href="#coaches">Тренеры</a>
+      <a href="#schedule">Расписание</a>
+      <a href="#plans">Абонементы</a>
+      <a href="#contacts">Контакты</a>
+    </nav>
+
+    <div class="header__actions">
+      <a class="header__phone" href="tel:+77000000000">+7 (700) 000-00-00</a>
+      <a class="btn btn--primary" href="#signup">Пробная тренировка</a>
+      <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="Меню">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" id="mobileNav" aria-label="Мобильная навигация">
+    <a href="#directions">Направления</a>
+    <a href="#method">Как тренируем</a>
+    <a href="#coaches">Тренеры</a>
+    <a href="#schedule">Расписание</a>
+    <a href="#plans">Абонементы</a>
+    <a href="#reviews">Отзывы</a>
+    <a href="#faq">Вопросы</a>
+    <a href="#contacts">Контакты</a>
+    <a class="btn btn--primary btn--lg" href="#signup">Записаться бесплатно</a>
+    <a class="btn btn--ghost btn--lg" href="tel:+77000000000">+7 (700) 000-00-00</a>
+  </nav>
+</header>
+
+<main id="main">
+<span id="top"></span>
+
+<!-- ================= HERO ================= -->
+<section class="hero">
+  <div class="hero__bg" aria-hidden="true"></div>
+  <div class="hero__grid-lines" aria-hidden="true"></div>
+  <div class="container hero__inner">
+    <div>
+      <span class="eyebrow">Фитнес-клуб · работаем с 07:00 до 23:00</span>
+      <h1>Твои <span class="hero__num">100%</span> начинаются здесь</h1>
+      <p class="lead hero__sub">
+        2 000 м² зала, более 100 тренажёров, 40 групповых занятий в неделю и тренеры,
+        которые доводят до результата, а не просто считают подходы.
+      </p>
+      <div class="hero__cta">
+        <a class="btn btn--primary btn--lg" href="#signup">Записаться на бесплатное занятие</a>
+        <a class="btn btn--ghost btn--lg" href="#plans">Смотреть абонементы</a>
+      </div>
+      <p class="hero__note">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Первый визит с тренером и диагностикой — бесплатно, без карты и предоплаты
+      </p>
+    </div>
+
+    <aside class="hero__card" aria-label="Ближайшие занятия сегодня">
+      <div class="hero__card-top">
+        <span class="hero__card-title">Сегодня в клубе</span>
+        <span class="badge"><span class="badge__dot"></span>идёт запись</span>
+      </div>
+      <div class="hero__rows" id="heroToday"></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ================= ЦИФРЫ ================= -->
+<section class="stats" aria-label="Клуб в цифрах">
+  <div class="container">
+    <div class="stats__grid">
+      <div class="stat">
+        <div class="stat__value" data-count="100" data-suffix="+">0</div>
+        <div class="stat__label">тренажёров и станций</div>
+      </div>
+      <div class="stat">
+        <div class="stat__value" data-count="24">0</div>
+        <div class="stat__label">тренера в команде</div>
+      </div>
+      <div class="stat">
+        <div class="stat__value" data-count="40" data-suffix="+">0</div>
+        <div class="stat__label">групповых в неделю</div>
+      </div>
+      <div class="stat">
+        <div class="stat__value" data-count="2000" data-suffix=" м²">0</div>
+        <div class="stat__label">площадь клуба</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= НАПРАВЛЕНИЯ ================= -->
+<section class="section" id="directions">
+  <div class="container">
+    <div class="section__head reveal">
+      <div>
+        <span class="eyebrow">Направления</span>
+        <h2>Шесть способов<br />прийти в форму</h2>
+      </div>
+      <p>Выбирайте одно направление или комбинируйте — абонемент даёт доступ ко всем зонам клуба.</p>
+    </div>
+
+    <div class="cards">
+      <article class="card reveal">
+        <div class="card__icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>
+        </div>
+        <h3>Тренажёрный зал</h3>
+        <p>Силовые рамы, свободные веса, кардиолиния с видом на город. Вводный инструктаж по технике — в подарок.</p>
+        <div class="card__meta"><span class="chip">Без ограничений по времени</span><span class="chip">Инструктаж</span></div>
+      </article>
+
+      <article class="card reveal">
+        <div class="card__icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3A4.5 4.5 0 0 1 15 18.5V20M17 14a4 4 0 0 1 4 4v2"/></svg>
+        </div>
+        <h3>Групповые программы</h3>
+        <p>Сайкл, HIIT, функционал, стретчинг, пилатес и танцевальные классы — 40+ занятий каждую неделю.</p>
+        <div class="card__meta"><span class="chip">По записи в приложении</span><span class="chip">До 16 человек</span></div>
+      </article>
+
+      <article class="card reveal">
+        <div class="card__icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="4"/></svg>
+        </div>
+        <h3>Персональный тренинг</h3>
+        <p>Индивидуальная программа под цель и график: техника, прогрессия нагрузки и контроль восстановления.</p>
+        <div class="card__meta"><span class="chip">Пакеты от 8 занятий</span><span class="chip">Отчёт о прогрессе</span></div>
+      </article>
+
+      <article class="card reveal">
+        <div class="card__icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4M14 4h6v6"/><circle cx="7" cy="17" r="3"/></svg>
+        </div>
+        <h3>Функциональный тренинг</h3>
+        <p>Канаты, сани, гири, петли и работа с собственным весом. Короткие интенсивные круги на 45 минут.</p>
+        <div class="card__meta"><span class="chip">Все уровни</span><span class="chip">45 минут</span></div>
+      </article>
+
+      <article class="card reveal">
+        <div class="card__icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="8" height="8" rx="2"/><path d="M11 12h4M15 9.5h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-5z"/></svg>
+        </div>
+        <h3>Единоборства и бокс</h3>
+        <p>Ринг, мешки, работа в парах. Базовая техника для новичков и спарринги для тех, кто уже в теме.</p>
+        <div class="card__meta"><span class="chip">Дети и взрослые</span><span class="chip">Инвентарь клуба</span></div>
+      </article>
+
+      <article class="card reveal">
+        <div class="card__icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="2.5"/><path d="M5 20c1.8-3.4 4.1-5.1 7-5.1s5.2 1.7 7 5.1M8.5 11h7"/></svg>
+        </div>
+        <h3>Йога и стретчинг</h3>
+        <p>Мягкая студия с тёплым полом: восстановление, мобильность суставов и работа со спиной после офиса.</p>
+        <div class="card__meta"><span class="chip">Утро и вечер</span><span class="chip">Коврики в зале</span></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= КАК ТРЕНИРУЕМ ================= -->
+<section class="section" id="method">
+  <div class="container method">
+    <div class="reveal">
+      <span class="eyebrow">Как тренируем</span>
+      <h2>Система из четырёх шагов</h2>
+      <p class="lead" style="margin-top:18px">
+        Мы не выдаём одинаковый план всем. Сначала смотрим, что с телом сейчас,
+        потом строим программу и каждые шесть недель сверяем результат с цифрами.
+      </p>
+      <a class="btn btn--primary btn--lg" href="#signup" style="margin-top:26px">Начать с диагностики</a>
+    </div>
+
+    <div class="steps">
+      <article class="step reveal">
+        <div class="step__num" aria-hidden="true"></div>
+        <div>
+          <h3>Диагностика на входе</h3>
+          <p>Замеры состава тела, подвижности и осанки, разговор про травмы, сон и режим. 40 минут, бесплатно.</p>
+        </div>
+      </article>
+      <article class="step reveal">
+        <div class="step__num" aria-hidden="true"></div>
+        <div>
+          <h3>Программа под цель</h3>
+          <p>Похудение, сила, выносливость или спина без боли — план на 8–12 недель с понятной нагрузкой по неделям.</p>
+        </div>
+      </article>
+      <article class="step reveal">
+        <div class="step__num" aria-hidden="true"></div>
+        <div>
+          <h3>Контроль техники</h3>
+          <p>Дежурный тренер в зале в любое время работы клуба: поправит технику и подберёт замену упражнению.</p>
+        </div>
+      </article>
+      <article class="step reveal">
+        <div class="step__num" aria-hidden="true"></div>
+        <div>
+          <h3>Прогресс в цифрах</h3>
+          <p>Контрольные замеры раз в 6 недель и корректировка плана. Видно, что именно изменилось, а не «вроде лучше».</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ТРЕНЕРЫ ================= -->
+<section class="section" id="coaches">
+  <div class="container">
+    <div class="section__head reveal">
+      <div>
+        <span class="eyebrow">Команда</span>
+        <h2>Тренеры клуба</h2>
+      </div>
+      <p>24 тренера с профильным образованием. Здесь — четверо, с кем чаще всего начинают новички.</p>
+    </div>
+
+    <div class="coaches">
+      <article class="coach reveal">
+        <div class="coach__avatar" aria-hidden="true">АК</div>
+        <h3>Алина К.</h3>
+        <div class="coach__role">Функциональный тренинг</div>
+        <p>9 лет в фитнесе. Ведёт утренние круги и работает с теми, кто возвращается к нагрузкам после перерыва.</p>
+        <div class="coach__tags"><span class="chip">Новички</span><span class="chip">Похудение</span></div>
+      </article>
+
+      <article class="coach reveal">
+        <div class="coach__avatar" aria-hidden="true">ДА</div>
+        <h3>Данияр А.</h3>
+        <div class="coach__role">Силовая подготовка</div>
+        <p>КМС по пауэрлифтингу. Приседания, тяга, жим — техника с нуля и подводка к личным рекордам.</p>
+        <div class="coach__tags"><span class="chip">Сила</span><span class="chip">Техника</span></div>
+      </article>
+
+      <article class="coach reveal">
+        <div class="coach__avatar" aria-hidden="true">МС</div>
+        <h3>Мадина С.</h3>
+        <div class="coach__role">Йога и мобильность</div>
+        <p>Сертификат RYT-500. Работа со спиной и шеей после сидячей работы, дыхание и восстановление.</p>
+        <div class="coach__tags"><span class="chip">Спина</span><span class="chip">Стретчинг</span></div>
+      </article>
+
+      <article class="coach reveal">
+        <div class="coach__avatar" aria-hidden="true">РМ</div>
+        <h3>Руслан М.</h3>
+        <div class="coach__role">Бокс и единоборства</div>
+        <p>Мастер спорта по боксу. Группы для взрослых и детей, индивидуальная работа на лапах.</p>
+        <div class="coach__tags"><span class="chip">Бокс</span><span class="chip">Дети 8+</span></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= РАСПИСАНИЕ ================= -->
+<section class="section" id="schedule">
+  <div class="container">
+    <div class="section__head reveal">
+      <div>
+        <span class="eyebrow">Расписание</span>
+        <h2>Групповые занятия</h2>
+      </div>
+      <p>Запись открывается за 7 дней. Отмена без списания — не позднее чем за 2 часа до старта.</p>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Дни недели" id="scheduleTabs"></div>
+    <div class="schedule" id="scheduleBody" role="region" aria-live="polite"></div>
+    <p class="schedule__note">Расписание может меняться в праздничные дни — актуальный вариант всегда на стойке ресепшн и в приложении клуба.</p>
+  </div>
+</section>
+
+<!-- ================= АБОНЕМЕНТЫ ================= -->
+<section class="section" id="plans">
+  <div class="container">
+    <div class="section__head reveal">
+      <div>
+        <span class="eyebrow">Абонементы</span>
+        <h2>Выберите формат</h2>
+      </div>
+      <div class="toggle" role="group" aria-label="Срок абонемента">
+        <button type="button" data-term="1" aria-pressed="true">1 месяц</button>
+        <button type="button" data-term="6" aria-pressed="false">6 месяцев</button>
+        <button type="button" data-term="12" aria-pressed="false">Год</button>
+      </div>
+    </div>
+
+    <div class="plans" id="plansGrid"></div>
+    <p class="schedule__note">Заморозка абонемента: до 14 дней на полугодовом и до 30 дней на годовом. Рассрочка без переплаты — на 3 и 6 месяцев.</p>
+  </div>
+</section>
+
+<!-- ================= ОТЗЫВЫ ================= -->
+<section class="section" id="reviews">
+  <div class="container">
+    <div class="section__head reveal">
+      <div>
+        <span class="eyebrow">Отзывы</span>
+        <h2>Что говорят клиенты</h2>
+      </div>
+    </div>
+
+    <div class="reviews">
+      <article class="review reveal">
+        <div class="review__stars" aria-label="Оценка 5 из 5">★★★★★</div>
+        <p>«Пришла с болью в пояснице после офиса. Тренер собрал программу вокруг спины, через два месяца забыла про мазь. Отдельное спасибо за то, что не продавали лишнего.»</p>
+        <div class="review__author">
+          <div class="review__avatar" aria-hidden="true">АС</div>
+          <div>
+            <div class="review__name">Айгерим С.</div>
+            <div class="review__meta">в клубе 8 месяцев</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="review reveal">
+        <div class="review__stars" aria-label="Оценка 5 из 5">★★★★★</div>
+        <p>«Ходил в три зала до этого. Здесь первый раз объяснили, зачем каждое упражнение и как считать прогресс. Плюс утром в 7:00 уже открыто — это решило всё.»</p>
+        <div class="review__author">
+          <div class="review__avatar" aria-hidden="true">ЕТ</div>
+          <div>
+            <div class="review__name">Ержан Т.</div>
+            <div class="review__meta">в клубе 1 год 2 месяца</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="review reveal">
+        <div class="review__stars" aria-label="Оценка 5 из 5">★★★★★</div>
+        <p>«Групповые — сильная сторона клуба. Народу не набивают, тренер успевает поправить каждого. Записалась на сайкл, осталась ещё и на функционал.»</p>
+        <div class="review__author">
+          <div class="review__avatar" aria-hidden="true">ДК</div>
+          <div>
+            <div class="review__name">Динара К.</div>
+            <div class="review__meta">в клубе 5 месяцев</div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section class="section" id="faq">
+  <div class="container">
+    <div class="section__head reveal">
+      <div>
+        <span class="eyebrow">Вопросы</span>
+        <h2>Коротко о главном</h2>
+      </div>
+    </div>
+    <div class="faq" id="faqList"></div>
+  </div>
+</section>
+
+<!-- ================= ЗАЯВКА + КОНТАКТЫ ================= -->
+<section class="section" id="signup">
+  <div class="container">
+    <div class="section__head reveal">
+      <div>
+        <span class="eyebrow">Запись</span>
+        <h2>Первая тренировка —<br />бесплатно</h2>
+      </div>
+      <p>Оставьте контакты: администратор перезвонит в течение рабочего дня, подберёт время и тренера.</p>
+    </div>
+
+    <div class="contact" id="contacts">
+      <form class="form-card reveal" id="signupForm" novalidate>
+        <h3>Заявка на пробное занятие</h3>
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="field">
+              <label for="name">Как к вам обращаться</label>
+              <input type="text" id="name" name="name" placeholder="Имя" autocomplete="name" required />
+              <span class="field__error" data-error-for="name"></span>
+            </div>
+            <div class="field">
+              <label for="phone">Телефон</label>
+              <input type="tel" id="phone" name="phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" required />
+              <span class="field__error" data-error-for="phone"></span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <label for="direction">Направление</label>
+              <select id="direction" name="direction">
+                <option>Тренажёрный зал</option>
+                <option>Групповые программы</option>
+                <option>Персональный тренинг</option>
+                <option>Функциональный тренинг</option>
+                <option>Единоборства и бокс</option>
+                <option>Йога и стретчинг</option>
+                <option>Ещё не решил(а)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="time">Удобное время</label>
+              <select id="time" name="time">
+                <option>Утро (07:00–11:00)</option>
+                <option>День (11:00–17:00)</option>
+                <option>Вечер (17:00–23:00)</option>
+                <option>Выходные</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="comment">Комментарий — необязательно</label>
+            <textarea id="comment" name="comment" placeholder="Цель, ограничения по здоровью, опыт тренировок"></textarea>
+          </div>
+
+          <label class="form-consent">
+            <input type="checkbox" id="consent" name="consent" required />
+            <span>Согласен(на) на обработку персональных данных и получение ответа по указанному номеру.</span>
+          </label>
+          <span class="field__error" data-error-for="consent"></span>
+
+          <button class="btn btn--primary btn--lg btn--block" type="submit">Отправить заявку</button>
+        </div>
+        <div class="form-status" id="formStatus" role="status"></div>
+      </form>
+
+      <div class="info">
+        <div class="info__block reveal">
+          <div class="info__label">Адрес</div>
+          <div class="info__value">г. Алматы, ул. Примерная, 100</div>
+          <p class="info__hint">ТРЦ «Пример», 3 этаж. Бесплатный паркинг для гостей клуба на 120 мест.</p>
+        </div>
+
+        <div class="info__block reveal">
+          <div class="info__label">Телефон и почта</div>
+          <div class="info__value"><a href="tel:+77000000000">+7 (700) 000-00-00</a></div>
+          <p class="info__hint"><a href="mailto:hello@fitness100.kz">hello@fitness100.kz</a> · ежедневно 07:00–23:00</p>
+          <div class="info__socials">
+            <a class="social" href="https://wa.me/77000000000" target="_blank" rel="noopener">WhatsApp</a>
+            <a class="social" href="https://t.me/" target="_blank" rel="noopener">Telegram</a>
+            <a class="social" href="https://instagram.com/" target="_blank" rel="noopener">Instagram</a>
+          </div>
+        </div>
+
+        <div class="map reveal" aria-label="Схема расположения клуба">
+          <div>
+            <div class="map__pin" aria-hidden="true"></div>
+            <strong>Фитнес 100</strong>
+            <p class="info__hint">ул. Примерная, 100 — 5 минут пешком от метро</p>
+            <a class="btn btn--ghost" href="https://2gis.kz/" target="_blank" rel="noopener" style="margin-top:14px">Открыть на карте</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CTA ================= -->
+<section class="section section--tight">
+  <div class="container">
+    <div class="cta-band reveal">
+      <div>
+        <h2>Приходите посмотреть клуб</h2>
+        <p>Экскурсия, диагностика и одна полноценная тренировка с тренером — бесплатно и без обязательств.</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn btn--primary btn--lg" href="#signup">Записаться</a>
+        <a class="btn btn--lg" href="tel:+77000000000" style="border:1px solid rgba(10,11,13,.25)">Позвонить</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ================= ПОДВАЛ ================= -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div>
+        <a class="logo" href="#top">
+          <span class="logo__mark">100</span>
+          <span>ФИТНЕС&nbsp;100</span>
+        </a>
+        <p class="footer__about">Фитнес-клуб полного цикла: зал, групповые программы, единоборства, персональный тренинг и восстановление.</p>
+      </div>
+      <div class="footer__col">
+        <h4>Клуб</h4>
+        <ul>
+          <li><a href="#directions">Направления</a></li>
+          <li><a href="#method">Как тренируем</a></li>
+          <li><a href="#coaches">Тренеры</a></li>
+          <li><a href="#schedule">Расписание</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Клиентам</h4>
+        <ul>
+          <li><a href="#plans">Абонементы</a></li>
+          <li><a href="#faq">Вопросы и ответы</a></li>
+          <li><a href="#reviews">Отзывы</a></li>
+          <li><a href="#signup">Пробное занятие</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Контакты</h4>
+        <ul>
+          <li><a href="tel:+77000000000">+7 (700) 000-00-00</a></li>
+          <li><a href="mailto:hello@fitness100.kz">hello@fitness100.kz</a></li>
+          <li><a href="#contacts">ул. Примерная, 100</a></li>
+          <li><a href="https://wa.me/77000000000" target="_blank" rel="noopener">WhatsApp</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© <span id="year">2026</span> Фитнес 100. Все права защищены.</span>
+      <span>Контакты и цены на странице — демонстрационные, замените на действующие.</span>
+    </div>
+  </div>
+</footer>
+
+<a class="btn btn--primary btn--lg fab" id="fab" href="#signup">Бесплатная тренировка</a>
+
+<script src="script.js"></script>
+</body>
+</html>
